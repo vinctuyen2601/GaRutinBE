@@ -10,6 +10,7 @@ import { ProductsModule } from './products/products.module';
 import { PostsModule } from './posts/posts.module';
 import { OrdersModule } from './orders/orders.module';
 import { MediaModule } from './media/media.module';
+import { GalleryModule } from './gallery/gallery.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { MediaModule } from './media/media.module';
     PostsModule,
     OrdersModule,
     MediaModule,
+    GalleryModule,
   ],
 })
 export class AppModule {}

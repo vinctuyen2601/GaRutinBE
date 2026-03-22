@@ -1,6 +1,11 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
+import {
+  GenerateProductDescriptionDto,
+  OptimizeProductSeoDto,
+  ImproveProductDescriptionDto,
+} from './dto/ai-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller()
@@ -49,5 +54,23 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  @Post('admin/products/ai/generate-description')
+  @UseGuards(JwtAuthGuard)
+  generateDescription(@Body() dto: GenerateProductDescriptionDto) {
+    return this.service.generateDescription(dto);
+  }
+
+  @Post('admin/products/ai/optimize-seo')
+  @UseGuards(JwtAuthGuard)
+  optimizeSeo(@Body() dto: OptimizeProductSeoDto) {
+    return this.service.optimizeSeo(dto);
+  }
+
+  @Post('admin/products/ai/improve-description')
+  @UseGuards(JwtAuthGuard)
+  improveDescription(@Body() dto: ImproveProductDescriptionDto) {
+    return this.service.improveDescription(dto);
   }
 }
