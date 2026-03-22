@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
+import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto } from './dto/ai-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller()
@@ -47,5 +48,23 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  @Post('admin/posts/ai/generate')
+  @UseGuards(JwtAuthGuard)
+  generateContent(@Body() dto: GenerateContentDto) {
+    return this.service.generateContent(dto);
+  }
+
+  @Post('admin/posts/ai/optimize-seo')
+  @UseGuards(JwtAuthGuard)
+  optimizeSeo(@Body() dto: OptimizeSeoDto) {
+    return this.service.optimizeSeo(dto);
+  }
+
+  @Post('admin/posts/ai/improve')
+  @UseGuards(JwtAuthGuard)
+  improveContent(@Body() dto: ImproveContentDto) {
+    return this.service.improveContent(dto);
   }
 }

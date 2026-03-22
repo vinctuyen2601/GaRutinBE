@@ -6,6 +6,7 @@ import { Category } from '../categories/entities/category.entity';
 import { Product } from '../products/entities/product.entity';
 import { Post } from '../posts/entities/post.entity';
 import { Order } from '../orders/entities/order.entity';
+import { MediaFile } from '../media/entities/media-file.entity';
 
 config();
 
@@ -13,7 +14,7 @@ export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
-  entities: [User, SiteConfig, Category, Product, Post, Order],
+  entities: [User, SiteConfig, Category, Product, Post, Order, MediaFile],
   migrations: ['src/database/migrations/*.ts'],
   migrationsTransactionMode: 'each',
   synchronize: false,
