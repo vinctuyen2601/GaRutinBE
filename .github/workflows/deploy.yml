@@ -28,3 +28,8 @@ jobs:
             npm run build
             pm2 restart garutin-be
             pm2 save
+            sleep 3
+            echo "=== PM2 STATUS ==="
+            pm2 show garutin-be
+            echo "=== LAST 30 LINES LOG ==="
+            pm2 logs garutin-be --lines 30 --nostream
