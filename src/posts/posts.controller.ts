@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto } from './dto/ai-post.dto';
+import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto } from './dto/ai-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller()
@@ -54,6 +54,12 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   generateContent(@Body() dto: GenerateContentDto) {
     return this.service.generateContent(dto);
+  }
+
+  @Post('admin/posts/ai/generate-from-url')
+  @UseGuards(JwtAuthGuard)
+  generateFromUrl(@Body() dto: GenerateFromUrlDto) {
+    return this.service.generateFromUrl(dto);
   }
 
   @Post('admin/posts/ai/optimize-seo')

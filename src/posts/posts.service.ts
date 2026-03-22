@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto } from './dto/ai-post.dto';
+import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto } from './dto/ai-post.dto';
 import { callLLM } from '../common/llm';
 
 @Injectable()
@@ -62,6 +62,100 @@ export class PostsService {
     const post = await this.findById(id);
     if (!post) throw new NotFoundException('Bài viết không tồn tại');
     await this.repo.softDelete(id);
+  }
+
+  async generateFromUrl(dto: GenerateFromUrlDto): Promise<{
+    title: string;
+    content: string;
+    excerpt: string;
+    slug: string;
+    seoTitle: string;
+    seoDescription: string;
+    tags: string[];
+    sourceUrl: string;
+  }> {
+    // Fetch trang web
+    let html: string;
+    try {
+      const res = await fetch(dto.url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; GaRutinBot/1.0)' },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      html = await res.text();
+    } catch (e: any) {
+      throw new Error(`Không thể tải trang: ${e.message}`);
+    }
+
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const pageTitle = titleMatch ? titleMatch[1].trim() : '';
+
+    // Extract meta description
+    const metaMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i);
+    const metaDesc = metaMatch ? metaMatch[1].trim() : '';
+
+    // Strip HTML → plain text, giữ khoảng trắng
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&#\d+;/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 4000);
+
+    if (text.length < 100) {
+      throw new Error('Trang web không có đủ nội dung để xử lý');
+    }
+
+    const categoryHint = dto.category ? ` Danh mục đích: "${dto.category}".` : '';
+
+    const aiText = await callLLM(
+      [
+        {
+          role: 'system',
+          content: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (garutin.com) chuyên về gà rutin (chim cút Nhật Bản).
+Nhiệm vụ: đọc nội dung từ URL được cung cấp, viết lại thành bài viết mới hoàn toàn phù hợp với chủ đề gà rutin.
+Không copy nguyên văn — phải viết lại theo góc nhìn của trang trại Gà Rutin, thêm thông tin thực tế về gà rutin.
+Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+        },
+        {
+          role: 'user',
+          content: `Viết lại bài viết từ nội dung sau cho website trang trại Gà Rutin.${categoryHint}
+
+Tiêu đề gốc: "${pageTitle}"
+Mô tả gốc: "${metaDesc}"
+Nội dung gốc (trích):
+"${text}"
+
+Trả về JSON:
+{
+  "title": "tiêu đề mới hấp dẫn liên quan gà rutin",
+  "content": "nội dung HTML hoàn chỉnh (dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>), tối thiểu 500 từ, viết lại góc nhìn gà rutin",
+  "excerpt": "tóm tắt 1-2 câu",
+  "slug": "slug-url-tieng-viet-khong-dau",
+  "seoTitle": "SEO title tối ưu (50-60 ký tự)",
+  "seoDescription": "meta description hấp dẫn (150-160 ký tự)",
+  "tags": ["tag1", "tag2", "tag3", "tag4"]
+}`,
+        },
+      ],
+      { maxTokens: 3000, temperature: 0.7, profile: 'quality' },
+    );
+
+    try {
+      const clean = aiText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+      const result = JSON.parse(clean);
+      return { ...result, sourceUrl: dto.url };
+    } catch {
+      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
+    }
   }
 
   async generateContent(dto: GenerateContentDto): Promise<{

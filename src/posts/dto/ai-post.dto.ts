@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, IsUrl } from 'class-validator';
 
 export class GenerateContentDto {
   @IsString()
@@ -35,6 +35,15 @@ export class OptimizeSeoDto {
   @IsArray()
   @IsOptional()
   tags?: string[];
+}
+
+export class GenerateFromUrlDto {
+  @IsUrl()
+  url: string;
+
+  @IsString()
+  @IsOptional()
+  category?: string;
 }
 
 export class ImproveContentDto {
