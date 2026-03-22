@@ -9,37 +9,79 @@
  */
 
 /**
+ * Escape các ký tự newline/tab thực sự nằm bên trong JSON string values.
+ * AI thường trả HTML nhiều dòng mà không escape → JSON.parse fail.
+ */
+function fixJsonStringNewlines(raw: string): string {
+  let inString = false;
+  let escaped = false;
+  let result = '';
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\' && inString) {
+      result += ch;
+      escaped = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+
+    if (inString) {
+      if (ch === '\n') { result += '\\n'; continue; }
+      if (ch === '\r') { result += '\\r'; continue; }
+      if (ch === '\t') { result += '\\t'; continue; }
+    }
+
+    result += ch;
+  }
+
+  return result;
+}
+
+/**
  * Extract JSON từ AI response — xử lý các trường hợp:
  * - Bọc trong ```json ... ```
  * - Có text giải thích trước/sau JSON
- * - JSON nằm giữa văn bản
+ * - JSON string values chứa newline thực sự (HTML nhiều dòng)
  */
 export function parseJsonFromAI<T = any>(text: string, context?: string): T {
-  // 1. Thử parse thẳng
-  try {
-    return JSON.parse(text.trim());
-  } catch {}
+  const candidates: string[] = [];
+
+  // 1. Text gốc
+  candidates.push(text.trim());
 
   // 2. Bóc markdown code block
   const codeBlock = text.match(/```(?:json)?\s*([\s\S]+?)```/i);
-  if (codeBlock) {
-    try {
-      return JSON.parse(codeBlock[1].trim());
-    } catch {}
-  }
+  if (codeBlock) candidates.push(codeBlock[1].trim());
 
-  // 3. Tìm JSON object đầu tiên trong text
+  // 3. Tìm JSON object đầu tiên
   const firstBrace = text.indexOf('{');
   const lastBrace = text.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace > firstBrace) {
-    try {
-      return JSON.parse(text.slice(firstBrace, lastBrace + 1));
-    } catch {}
+    candidates.push(text.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    // Thử parse thẳng
+    try { return JSON.parse(candidate); } catch {}
+    // Thử sau khi fix newlines bên trong strings
+    try { return JSON.parse(fixJsonStringNewlines(candidate)); } catch {}
   }
 
   // Không parse được — log để debug
-  const preview = text.slice(0, 300);
-  console.error(`[LLM] JSON parse failed${context ? ` (${context})` : ''}. Response preview:\n${preview}`);
+  console.error(`[LLM] JSON parse failed${context ? ` (${context})` : ''}. Response preview:\n${text.slice(0, 400)}`);
   throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
 }
 
