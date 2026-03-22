@@ -9,9 +9,9 @@ async function bootstrap() {
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:5174',
-    'https://garutin.vn',
-    'https://www.garutin.vn',
-    'https://cms.garutin.vn',
+    'https://garutin.com',
+    'https://www.garutin.com',
+    'https://cms.garutin.com',
     ...(process.env.CMS_URL ? [process.env.CMS_URL] : []),
     ...(process.env.WEB_URL ? [process.env.WEB_URL] : []),
   ];
