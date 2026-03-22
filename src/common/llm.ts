@@ -8,6 +8,41 @@
  *   OPENROUTER_API_KEY — openrouter.ai (free models available)
  */
 
+/**
+ * Extract JSON từ AI response — xử lý các trường hợp:
+ * - Bọc trong ```json ... ```
+ * - Có text giải thích trước/sau JSON
+ * - JSON nằm giữa văn bản
+ */
+export function parseJsonFromAI<T = any>(text: string, context?: string): T {
+  // 1. Thử parse thẳng
+  try {
+    return JSON.parse(text.trim());
+  } catch {}
+
+  // 2. Bóc markdown code block
+  const codeBlock = text.match(/```(?:json)?\s*([\s\S]+?)```/i);
+  if (codeBlock) {
+    try {
+      return JSON.parse(codeBlock[1].trim());
+    } catch {}
+  }
+
+  // 3. Tìm JSON object đầu tiên trong text
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+    } catch {}
+  }
+
+  // Không parse được — log để debug
+  const preview = text.slice(0, 300);
+  console.error(`[LLM] JSON parse failed${context ? ` (${context})` : ''}. Response preview:\n${preview}`);
+  throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
+}
+
 interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;

@@ -8,7 +8,7 @@ import {
   OptimizeProductSeoDto,
   ImproveProductDescriptionDto,
 } from './dto/ai-product.dto';
-import { callLLM } from '../common/llm';
+import { callLLM, parseJsonFromAI } from '../common/llm';
 
 @Injectable()
 export class ProductsService {
@@ -114,15 +114,7 @@ Trả về JSON:
       { maxTokens: 1200, temperature: 0.7, profile: 'quality' },
     );
 
-    try {
-      const clean = text
-        .replace(/^```json\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
-      return JSON.parse(clean);
-    } catch {
-      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
-    }
+    return parseJsonFromAI(text, 'products');
   }
 
   async optimizeSeo(dto: OptimizeProductSeoDto): Promise<{
@@ -163,15 +155,7 @@ Trả về JSON:
       { maxTokens: 600, temperature: 0.3, profile: 'quality' },
     );
 
-    try {
-      const clean = text
-        .replace(/^```json\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
-      return JSON.parse(clean);
-    } catch {
-      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
-    }
+    return parseJsonFromAI(text, 'products');
   }
 
   async improveDescription(dto: ImproveProductDescriptionDto): Promise<{
@@ -203,14 +187,6 @@ Trả về JSON:
       { maxTokens: 1200, temperature: 0.5, profile: 'quality' },
     );
 
-    try {
-      const clean = text
-        .replace(/^```json\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
-      return JSON.parse(clean);
-    } catch {
-      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
-    }
+    return parseJsonFromAI(text, 'products');
   }
 }

@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto } from './dto/ai-post.dto';
-import { callLLM } from '../common/llm';
+import { callLLM, parseJsonFromAI } from '../common/llm';
 
 @Injectable()
 export class PostsService {
@@ -149,13 +149,8 @@ Trả về JSON:
       { maxTokens: 3000, temperature: 0.7, profile: 'quality' },
     );
 
-    try {
-      const clean = aiText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-      const result = JSON.parse(clean);
-      return { ...result, sourceUrl: dto.url };
-    } catch {
-      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
-    }
+    const result = parseJsonFromAI(aiText, 'generateFromUrl');
+    return { ...result, sourceUrl: dto.url };
   }
 
   async generateContent(dto: GenerateContentDto): Promise<{
@@ -197,12 +192,7 @@ Trả về JSON với cấu trúc:
       { maxTokens: 3000, temperature: 0.7, profile: 'quality' },
     );
 
-    try {
-      const clean = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-      return JSON.parse(clean);
-    } catch {
-      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
-    }
+    return parseJsonFromAI(text, 'generateContent');
   }
 
   async optimizeSeo(dto: OptimizeSeoDto): Promise<{
@@ -245,12 +235,7 @@ Trả về JSON:
       { maxTokens: 1000, temperature: 0.3, profile: 'quality' },
     );
 
-    try {
-      const clean = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-      return JSON.parse(clean);
-    } catch {
-      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
-    }
+    return parseJsonFromAI(text, 'optimizeSeo');
   }
 
   async improveContent(dto: ImproveContentDto): Promise<{
@@ -289,11 +274,6 @@ Trả về JSON:
       { maxTokens: 3000, temperature: 0.5, profile: 'quality' },
     );
 
-    try {
-      const clean = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-      return JSON.parse(clean);
-    } catch {
-      throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
-    }
+    return parseJsonFromAI(text, 'improveContent');
   }
 }
