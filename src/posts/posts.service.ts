@@ -201,79 +201,143 @@ Trả về JSON với cấu trúc:
     slug: string;
     tags: string[];
     suggestions: string[];
+    manualSuggestions: string[];
   }> {
-    const contentSnippet = dto.content.replace(/<[^>]+>/g, '').slice(0, 1500);
+    const contentSnippet = dto.content
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 3000);
 
-    const text = await callLLM(
-      [
-        {
-          role: 'system',
-          content: `Bạn là chuyên gia SEO cho website trang trại Gà Rutin (garutin.com).
-Phân tích và tối ưu SEO cho bài viết về nuôi gà rutin, trứng gà rutin.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
-        },
-        {
-          role: 'user',
-          content: `Tối ưu SEO cho bài viết:
-Tiêu đề: "${dto.title}"
-Nội dung (trích): "${contentSnippet}"
-SEO Title hiện tại: "${dto.seoTitle || ''}"
-SEO Description hiện tại: "${dto.seoDescription || ''}"
-Slug hiện tại: "${dto.slug || ''}"
-Tags hiện tại: ${JSON.stringify(dto.tags || [])}
+    const systemPrompt = `Bạn là chuyên gia SEO cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản), trứng cút, kỹ thuật chăn nuôi.
+Nhiệm vụ: Tối ưu hóa metadata SEO cho bài viết, giúp rank cao trên Google Việt Nam.
 
-Trả về JSON:
-{
-  "seoTitle": "SEO title tối ưu (50-60 ký tự)",
-  "seoDescription": "meta description hấp dẫn (150-160 ký tự)",
-  "slug": "slug-toi-uu-tieng-viet-khong-dau",
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "suggestions": ["gợi ý cải thiện SEO 1", "gợi ý 2", "gợi ý 3"]
-}`,
-        },
-      ],
-      { maxTokens: 1000, temperature: 0.3, profile: 'quality' },
+Quy tắc NGHIÊM NGẶT:
+- seoTitle: 50-60 ký tự — từ khóa chính PHẢI xuất hiện ở đầu, dùng power words (Bí quyết/Top N/Cách/Hướng dẫn), tránh dùng tên brand
+- seoDescription: 145-158 ký tự — cấu trúc: Hook(vấn đề người dùng) + Giải pháp ngắn + CTA (Khám phá/Tìm hiểu ngay). KHÔNG bắt đầu bằng "Bài viết" hay "Chúng tôi"
+- slug: 3-6 từ tiếng Việt không dấu, có từ khóa chính, chỉ a-z0-9 và dấu gạch ngang, không có "bai-viet" hay "huong-dan" ở đầu
+- tags: mảng 5-7 tags — 2 broad keyword ngắn (1-2 từ) + 3-4 long-tail keyword (3-5 từ) — là những gì người Việt hay tìm trên Google về gà rutin
+- manualSuggestions: mảng gợi ý cụ thể cần chỉnh tay — ưu tiên: (1) thêm internal link đến /san-pham hoặc /blog/category/X với anchor text tự nhiên, (2) thêm H3 câu hỏi "?" + đoạn trả lời ngắn để có FAQ schema, (3) bổ sung số liệu/thống kê cụ thể về gà rutin
+- suggestions: mô tả ngắn những thay đổi AI đã thực hiện
+
+Chỉ trả về JSON thuần (không markdown):
+{"seoTitle":"...","seoDescription":"...","slug":"...","tags":[...],"suggestions":[...],"manualSuggestions":[]}`;
+
+    const userPrompt = `Tiêu đề bài viết: ${dto.title}
+
+Nội dung bài viết:
+${contentSnippet}
+
+Thông tin hiện tại (có thể rỗng):
+- seoTitle hiện tại: ${dto.seoTitle || '(chưa có)'}
+- seoDescription hiện tại: ${dto.seoDescription || '(chưa có)'}
+- slug hiện tại: ${dto.slug || '(chưa có)'}
+- tags hiện tại: ${dto.tags?.join(', ') || '(chưa có)'}`;
+
+    const rawText = await callLLM(
+      [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+      { maxTokens: 800, temperature: 0.3, profile: 'quality' },
     );
 
-    return parseJsonFromAI(text, 'optimizeSeo');
+    let parsed: Record<string, any> = {};
+    try {
+      const json = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+      parsed = JSON.parse(json);
+    } catch {
+      throw new Error('AI trả về dữ liệu không hợp lệ, thử lại');
+    }
+
+    return {
+      seoTitle: parsed.seoTitle ?? '',
+      seoDescription: parsed.seoDescription ?? '',
+      slug: parsed.slug ?? '',
+      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+      manualSuggestions: Array.isArray(parsed.manualSuggestions) ? parsed.manualSuggestions : [],
+    };
   }
 
   async improveContent(dto: ImproveContentDto): Promise<{
     content: string;
     excerpt: string;
-    improvements: string[];
+    summary: string;
   }> {
-    const issuesHint = dto.issues?.length ? `\nVấn đề cần khắc phục: ${dto.issues.join(', ')}` : '';
-    const scoreHint = dto.contentScore !== undefined ? `\nĐiểm chất lượng hiện tại: ${dto.contentScore}/100` : '';
-    const contentSnippet = dto.content.replace(/<[^>]+>/g, '').slice(0, 2000);
+    const issuesList = (dto.issues ?? []).map((i) => `- ${i}`).join('\n');
+    const scoreContext = dto.contentScore !== undefined
+      ? `Điểm chất lượng hiện tại: ${dto.contentScore}/100.\n`
+      : '';
 
-    const text = await callLLM(
-      [
-        {
-          role: 'system',
-          content: `Bạn là chuyên gia biên tập nội dung cho trang trại Gà Rutin.
-Cải thiện chất lượng bài viết: thêm thông tin chuyên sâu, cải thiện cấu trúc, tăng tính hữu ích cho người nuôi gà rutin.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
-        },
-        {
-          role: 'user',
-          content: `Cải thiện bài viết:
-Tiêu đề: "${dto.title}"
-Danh mục: "${dto.category || 'chung'}"${scoreHint}${issuesHint}
-Nội dung hiện tại (trích):
-"${contentSnippet}"
+    const systemPrompt = `Bạn là chuyên gia biên tập nội dung cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản).
+Nhiệm vụ: Cải thiện bài viết HTML để tăng điểm chất lượng nội dung, giúp rank tốt hơn trên Google Việt Nam.
 
-Trả về JSON:
-{
-  "content": "nội dung HTML đã cải thiện hoàn chỉnh (dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>)",
-  "excerpt": "tóm tắt mới hấp dẫn hơn",
-  "improvements": ["thay đổi đã thực hiện 1", "thay đổi 2", "thay đổi 3"]
-}`,
-        },
-      ],
-      { maxTokens: 3000, temperature: 0.5, profile: 'quality' },
+NGUYÊN TẮC BẮT BUỘC:
+1. Fix TOÀN BỘ các vấn đề được liệt kê trong danh sách
+2. Giữ nguyên thông tin cốt lõi, cấu trúc bài — KHÔNG bịa số liệu hay thông tin không có trong bài gốc
+3. Thêm context thực tế: giá VND (200k, 500k...), địa danh VN, mùa vụ, kinh nghiệm nuôi gà rutin thực tế
+4. Nếu thiếu FAQ: thêm section cuối bài với ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn trả lời <p> ngắn
+5. Nếu thiếu CTA: thêm link tự nhiên <a href="/san-pham">xem sản phẩm</a> hoặc đề cập "Gà Rutin"
+6. Nếu thiếu internal link: thêm ít nhất 1 <a href="/blog/...">bài liên quan</a> phù hợp ngữ cảnh
+7. Giọng văn: thân thiện, chuyên môn — phù hợp người nuôi gia cầm Việt Nam
+8. Nếu bài ngắn (< 800 từ): mở rộng các section hiện có, KHÔNG thêm nội dung vô nghĩa
+9. Output PHẢI là HTML hợp lệ (<h2>, <h3>, <p>, <ul>, <ol>, <li>, <a>, <strong>) — KHÔNG dùng markdown
+
+FORMAT OUTPUT BẮT BUỘC (giữ đúng 3 dòng delimiter):
+SUMMARY: [một dòng tóm tắt những gì đã thêm/sửa, ví dụ: Đã thêm FAQ 3 câu, +400 từ, CTA /san-pham, 1 internal link]
+===EXCERPT===
+[tóm tắt 1-2 câu hấp dẫn cho bài viết]
+===HTML===
+[toàn bộ HTML nội dung bài viết đã cải thiện]`;
+
+    const cleanContent = dto.content
+      .replace(/\s+style="[^"]*"/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 12000);
+
+    const userPrompt = `Tiêu đề: ${dto.title}
+Danh mục: ${dto.category ?? 'chung'}
+${scoreContext}
+Các vấn đề cần khắc phục (PHẢI fix tất cả):
+${issuesList || '- Tổng thể cải thiện chất lượng nội dung'}
+
+Nội dung HTML hiện tại:
+${cleanContent}`;
+
+    const rawText = await callLLM(
+      [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+      { maxTokens: 6000, temperature: 0.4, profile: 'quality' },
     );
 
-    return parseJsonFromAI(text, 'improveContent');
+    // Parse delimiter format
+    const htmlDelimiter = '===HTML===';
+    const excerptDelimiter = '===EXCERPT===';
+    const htmlIdx = rawText.indexOf(htmlDelimiter);
+    const excerptIdx = rawText.indexOf(excerptDelimiter);
+
+    if (htmlIdx !== -1) {
+      const beforeHtml = rawText.slice(0, htmlIdx).trim();
+      const htmlContent = rawText.slice(htmlIdx + htmlDelimiter.length).trim();
+      const cleanHtml = htmlContent.replace(/^```(?:html)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+      const summaryMatch = beforeHtml.match(/^SUMMARY:\s*(.+)$/im);
+      const summary = summaryMatch?.[1]?.trim() ?? 'Nội dung đã được cải thiện.';
+
+      let excerpt = '';
+      if (excerptIdx !== -1 && excerptIdx < htmlIdx) {
+        const excerptRaw = rawText.slice(excerptIdx + excerptDelimiter.length, htmlIdx).trim();
+        excerpt = excerptRaw.replace(/<[^>]+>/g, '').trim();
+      }
+
+      if (cleanHtml) return { content: cleanHtml, excerpt, summary };
+    }
+
+    // Fallback: AI trả về HTML thẳng
+    const stripped = rawText.replace(/^```(?:html)?\s*/i, '').replace(/\s*```$/i, '').trim();
+    if (stripped.startsWith('<')) {
+      return { content: stripped, excerpt: '', summary: 'Nội dung đã được cải thiện.' };
+    }
+
+    throw new Error('AI trả về dữ liệu không hợp lệ, thử lại');
   }
 }

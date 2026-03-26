@@ -41,6 +41,15 @@ export class Post {
   @Column({ name: 'seo_description', nullable: true })
   seoDescription: string;
 
+  @Column({ name: 'seo_score', type: 'int', nullable: true })
+  seoScore: number;
+
+  @Column({ name: 'content_score', type: 'int', nullable: true })
+  contentScore: number;
+
+  @Column({ name: 'seo_details', type: 'jsonb', nullable: true })
+  seoDetails: Record<string, any>;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
