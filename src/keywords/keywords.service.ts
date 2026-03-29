@@ -36,7 +36,11 @@ export class KeywordsService {
     if (!kw) throw new NotFoundException('Keyword không tồn tại');
 
     // Deactivate tất cả, activate cái được chọn
-    await this.repo.update({}, { isActive: false });
+    await this.repo.createQueryBuilder()
+      .update()
+      .set({ isActive: false })
+      .where('is_active = true')
+      .execute();
     kw.isActive = true;
     return this.repo.save(kw);
   }
