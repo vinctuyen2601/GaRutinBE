@@ -3,14 +3,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto } from './dto/ai-post.dto';
+import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto, CrawlToDraftsDto } from './dto/ai-post.dto';
 import { callLLM, parseJsonFromAI } from '../common/llm';
+import { CrawlerService } from './crawler.service';
+import { SearchService } from './search.service';
+import { KeywordsService } from '../keywords/keywords.service';
 
 @Injectable()
 export class PostsService {
   constructor(
     @InjectRepository(Post)
     private readonly repo: Repository<Post>,
+    private readonly crawlerService: CrawlerService,
+    private readonly searchService: SearchService,
+    private readonly keywordsService: KeywordsService,
   ) {}
 
   findPublished(params: { category?: string; page?: number; limit?: number } = {}): Promise<Post[]> {
@@ -339,5 +345,193 @@ ${cleanContent}`;
     }
 
     throw new Error('AI trả về dữ liệu không hợp lệ, thử lại');
+  }
+
+  async crawlToDrafts(dto: CrawlToDraftsDto): Promise<{
+    keyword: string;
+    created: Post[];
+    errors: { url: string; reason: string }[];
+  }> {
+    // 1. Lấy keyword đang active
+    const activeKeyword = await this.keywordsService.findActive();
+    if (!activeKeyword) {
+      throw new NotFoundException('Không có keyword nào đang active. Vui lòng activate một keyword trước.');
+    }
+
+    const limit = Math.min(dto.limit ?? 3, 3);
+
+    // 2. Search Google lấy URLs
+    const searchResults = await this.searchService.searchGoogle(activeKeyword.keyword, limit);
+    if (!searchResults.length) {
+      throw new NotFoundException('Không tìm được URL nào từ keyword này. Kiểm tra SERPER_API_KEY.');
+    }
+
+    const created: Post[] = [];
+    const errors: { url: string; reason: string }[] = [];
+
+    await Promise.all(
+      searchResults.map(async ({ url }) => {
+        try {
+          // 3. Crawl & extract
+          const extracted = await this.crawlerService.fetchAndExtract(url);
+          if (!extracted || extracted.wordCount < 100) {
+            errors.push({ url, reason: 'Trang không có đủ nội dung để xử lý' });
+            return;
+          }
+
+          // 4. AI viết lại theo góc nhìn Gà Rutin
+          const categoryHint = activeKeyword.category ? ` Danh mục: "${activeKeyword.category}".` : '';
+          const rewriteRaw = await callLLM(
+            [
+              {
+                role: 'system',
+                content: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (garutin.com) chuyên về gà rutin (chim cút Nhật Bản).
+Nhiệm vụ: đọc nội dung từ nguồn, viết lại thành bài viết mới hoàn toàn phù hợp với chủ đề gà rutin.
+Không copy nguyên văn — viết lại theo góc nhìn trang trại Gà Rutin, thêm thông tin thực tế.
+Chỉ trả về JSON thuần (không markdown):`,
+              },
+              {
+                role: 'user',
+                content: `Viết lại bài viết từ nội dung sau cho website Gà Rutin.${categoryHint}
+Keyword chủ đề: "${activeKeyword.keyword}"
+
+Tiêu đề gốc: "${extracted.title}"
+Mô tả gốc: "${extracted.excerpt}"
+Nội dung gốc (trích):
+"${extracted.content}"
+
+Trả về JSON:
+{
+  "title": "tiêu đề mới hấp dẫn liên quan gà rutin, có keyword",
+  "content": "nội dung HTML hoàn chỉnh (dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>), tối thiểu 600 từ",
+  "excerpt": "tóm tắt 1-2 câu"
+}`,
+              },
+            ],
+            { maxTokens: 3000, temperature: 0.7, profile: 'quality' },
+          );
+          const rewritten = parseJsonFromAI(rewriteRaw, 'crawlToDrafts:rewrite');
+
+          // 5. Tối ưu nội dung
+          const improveRaw = await callLLM(
+            [
+              {
+                role: 'system',
+                content: `Bạn là chuyên gia biên tập nội dung cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản).
+NGUYÊN TẮC BẮT BUỘC:
+1. Giữ nguyên thông tin cốt lõi — KHÔNG bịa số liệu
+2. Thêm context thực tế: giá VND, kinh nghiệm nuôi gà rutin thực tế
+3. Thêm section FAQ cuối bài: ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn <p> trả lời ngắn
+4. Thêm link CTA tự nhiên <a href="/san-pham">xem sản phẩm</a>
+5. Nếu bài ngắn (< 800 từ): mở rộng các section hiện có
+6. Output PHẢI là HTML hợp lệ — KHÔNG dùng markdown
+
+FORMAT OUTPUT BẮT BUỘC:
+SUMMARY: [tóm tắt 1 dòng]
+===EXCERPT===
+[tóm tắt 1-2 câu hấp dẫn]
+===HTML===
+[toàn bộ HTML nội dung đã cải thiện]`,
+              },
+              {
+                role: 'user',
+                content: `Tiêu đề: ${rewritten.title}
+Keyword: "${activeKeyword.keyword}"
+Danh mục: ${activeKeyword.category ?? 'chung'}
+
+Nội dung HTML hiện tại:
+${rewritten.content}`,
+              },
+            ],
+            { maxTokens: 6000, temperature: 0.4, profile: 'quality' },
+          );
+
+          let improvedContent: string = rewritten.content;
+          let improvedExcerpt: string = rewritten.excerpt ?? '';
+          const htmlIdx = improveRaw.indexOf('===HTML===');
+          const excerptIdx = improveRaw.indexOf('===EXCERPT===');
+          if (htmlIdx !== -1) {
+            const htmlPart = improveRaw.slice(htmlIdx + '===HTML==='.length).trim()
+              .replace(/^```(?:html)?\s*/i, '').replace(/\s*```$/i, '').trim();
+            if (htmlPart) improvedContent = htmlPart;
+            if (excerptIdx !== -1 && excerptIdx < htmlIdx) {
+              const excerptPart = improveRaw.slice(excerptIdx + '===EXCERPT==='.length, htmlIdx).trim()
+                .replace(/<[^>]+>/g, '').trim();
+              if (excerptPart) improvedExcerpt = excerptPart;
+            }
+          }
+
+          // 6. Tối ưu SEO
+          const contentSnippet = improvedContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000);
+          const seoRaw = await callLLM(
+            [
+              {
+                role: 'system',
+                content: `Bạn là chuyên gia SEO cho garutin.com — website trang trại Gà Rutin.
+Quy tắc NGHIÊM NGẶT:
+- seoTitle: 50-60 ký tự — keyword PHẢI xuất hiện ở đầu, dùng power words
+- seoDescription: 145-158 ký tự — Hook + Giải pháp + CTA. KHÔNG bắt đầu bằng "Bài viết"
+- slug: 3-6 từ tiếng Việt không dấu, chỉ a-z0-9 và dấu gạch ngang
+- tags: 5-7 tags — 2 broad (1-2 từ) + 3-4 long-tail (3-5 từ)
+Chỉ trả về JSON thuần: {"seoTitle":"...","seoDescription":"...","slug":"...","tags":[...]}`,
+              },
+              {
+                role: 'user',
+                content: `Keyword: "${activeKeyword.keyword}"
+Tiêu đề: ${rewritten.title}
+Nội dung: ${contentSnippet}`,
+              },
+            ],
+            { maxTokens: 600, temperature: 0.3, profile: 'quality' },
+          );
+
+          let seo: { seoTitle?: string; seoDescription?: string; slug?: string; tags?: string[] } = {};
+          try {
+            seo = JSON.parse(seoRaw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+          } catch {
+            seo = {};
+          }
+
+          // 7. Slug unique
+          let baseSlug = seo.slug || rewritten.title
+            .toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/đ/g, 'd')
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .slice(0, 80);
+          let slug = baseSlug;
+          let counter = 2;
+          while (await this.repo.findOne({ where: { slug } })) {
+            slug = `${baseSlug}-${counter++}`;
+          }
+
+          // 8. Lưu draft gắn với keyword
+          const post = this.repo.create({
+            title: rewritten.title,
+            slug,
+            content: improvedContent,
+            excerpt: improvedExcerpt,
+            category: activeKeyword.category,
+            tags: seo.tags ?? [],
+            seoTitle: seo.seoTitle ?? '',
+            seoDescription: seo.seoDescription ?? '',
+            keywordId: activeKeyword.id,
+            status: 'draft',
+          });
+          const saved = await this.repo.save(post);
+          created.push(saved);
+        } catch (e: any) {
+          errors.push({ url, reason: e.message ?? 'Lỗi không xác định' });
+        }
+      }),
+    );
+
+    // 9. Cập nhật thống kê keyword
+    if (created.length > 0) {
+      await this.keywordsService.markCrawled(activeKeyword.id);
+    }
+
+    return { keyword: activeKeyword.keyword, created, errors };
   }
 }

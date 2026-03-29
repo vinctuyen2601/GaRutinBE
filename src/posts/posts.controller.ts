@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto } from './dto/ai-post.dto';
+import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto, CrawlToDraftsDto } from './dto/ai-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller()
@@ -72,5 +72,11 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   improveContent(@Body() dto: ImproveContentDto) {
     return this.service.improveContent(dto);
+  }
+
+  @Post('admin/posts/ai/crawl-to-drafts')
+  @UseGuards(JwtAuthGuard)
+  crawlToDrafts(@Body() dto: CrawlToDraftsDto) {
+    return this.service.crawlToDrafts(dto);
   }
 }

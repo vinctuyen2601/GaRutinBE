@@ -46,6 +46,12 @@ export class GenerateFromUrlDto {
   category?: string;
 }
 
+export class CrawlToDraftsDto {
+  @IsNumber()
+  @IsOptional()
+  limit?: number;
+}
+
 export class ImproveContentDto {
   @IsString()
   title: string;

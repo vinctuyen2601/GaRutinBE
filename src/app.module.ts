@@ -11,6 +11,7 @@ import { PostsModule } from './posts/posts.module';
 import { OrdersModule } from './orders/orders.module';
 import { MediaModule } from './media/media.module';
 import { GalleryModule } from './gallery/gallery.module';
+import { KeywordsModule } from './keywords/keywords.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { GalleryModule } from './gallery/gallery.module';
     OrdersModule,
     MediaModule,
     GalleryModule,
+    KeywordsModule,
   ],
 })
 export class AppModule {}
