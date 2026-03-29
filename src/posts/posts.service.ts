@@ -369,8 +369,12 @@ ${cleanContent}`;
     const created: Post[] = [];
     const errors: { url: string; reason: string }[] = [];
 
+    const LANG_LABEL: Record<string, string> = {
+      vi: 'tiếng Việt', ja: 'tiếng Nhật', ko: 'tiếng Hàn', en: 'tiếng Anh',
+    };
+
     await Promise.all(
-      searchResults.map(async ({ url }) => {
+      searchResults.map(async ({ url, lang }) => {
         try {
           // 3. Crawl & extract
           const extracted = await this.crawlerService.fetchAndExtract(url);
@@ -381,18 +385,21 @@ ${cleanContent}`;
 
           // 4. AI viết lại theo góc nhìn Gà Rutin
           const categoryHint = activeKeyword.category ? ` Danh mục: "${activeKeyword.category}".` : '';
+          const langNote = lang !== 'vi'
+            ? ` Nội dung gốc bằng ${LANG_LABEL[lang] ?? lang} — hãy dịch và viết lại hoàn toàn bằng tiếng Việt.`
+            : '';
           const rewriteRaw = await callLLM(
             [
               {
                 role: 'system',
                 content: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (garutin.com) chuyên về gà rutin (chim cút Nhật Bản).
-Nhiệm vụ: đọc nội dung từ nguồn, viết lại thành bài viết mới hoàn toàn phù hợp với chủ đề gà rutin.
-Không copy nguyên văn — viết lại theo góc nhìn trang trại Gà Rutin, thêm thông tin thực tế.
+Nhiệm vụ: đọc nội dung từ nguồn, viết lại thành bài viết mới hoàn toàn bằng tiếng Việt phù hợp với chủ đề gà rutin.
+Không copy nguyên văn — viết lại theo góc nhìn trang trại Gà Rutin, thêm thông tin thực tế Việt Nam.
 Chỉ trả về JSON thuần (không markdown):`,
               },
               {
                 role: 'user',
-                content: `Viết lại bài viết từ nội dung sau cho website Gà Rutin.${categoryHint}
+                content: `Viết lại bài viết từ nội dung sau cho website Gà Rutin.${categoryHint}${langNote}
 Keyword chủ đề: "${activeKeyword.keyword}"
 
 Tiêu đề gốc: "${extracted.title}"
@@ -403,7 +410,7 @@ Nội dung gốc (trích):
 Trả về JSON:
 {
   "title": "tiêu đề mới hấp dẫn liên quan gà rutin, có keyword",
-  "content": "nội dung HTML hoàn chỉnh (dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>), tối thiểu 600 từ",
+  "content": "nội dung HTML hoàn chỉnh bằng tiếng Việt (dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>), tối thiểu 600 từ",
   "excerpt": "tóm tắt 1-2 câu"
 }`,
               },
