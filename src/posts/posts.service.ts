@@ -389,92 +389,58 @@ ${cleanContent}`;
             continue;
           }
 
-          // 4. AI viết lại theo góc nhìn Gà Rutin
+          // 4. AI viết lại + cải thiện trong 1 call (rewrite + improve gộp)
           const categoryHint = activeKeyword.category ? ` Danh mục: "${activeKeyword.category}".` : '';
           const langNote = lang !== 'vi'
-            ? ` Nội dung gốc bằng ${LANG_LABEL[lang] ?? lang} — hãy dịch và viết lại hoàn toàn bằng tiếng Việt.`
+            ? ` Nội dung gốc bằng ${LANG_LABEL[lang] ?? lang} — dịch và viết lại hoàn toàn bằng tiếng Việt.`
             : '';
           const rewriteRaw = await callLLM(
             [
               {
                 role: 'system',
                 content: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (garutin.com) chuyên về gà rutin (chim cút Nhật Bản).
-Nhiệm vụ: đọc nội dung từ nguồn, viết lại thành bài viết mới hoàn toàn bằng tiếng Việt phù hợp với chủ đề gà rutin.
-Không copy nguyên văn — viết lại theo góc nhìn trang trại Gà Rutin, thêm thông tin thực tế Việt Nam.
-Chỉ trả về JSON thuần (không markdown):`,
-              },
-              {
-                role: 'user',
-                content: `Viết lại bài viết từ nội dung sau cho website Gà Rutin.${categoryHint}${langNote}
-Keyword chủ đề: "${activeKeyword.keyword}"
+Nhiệm vụ: đọc nội dung từ nguồn, viết thành bài viết hoàn chỉnh bằng tiếng Việt theo góc nhìn trang trại Gà Rutin.
+YÊU CẦU BẮT BUỘC:
+- Không copy nguyên văn, thêm thông tin thực tế Việt Nam (giá VND, kinh nghiệm nuôi)
+- Tối thiểu 700 từ, dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>
+- Thêm section FAQ cuối bài: ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn <p> trả lời ngắn
+- Thêm 1 link CTA tự nhiên: <a href="/san-pham">xem sản phẩm</a>
 
-Tiêu đề gốc: "${extracted.title}"
-Mô tả gốc: "${extracted.excerpt}"
-Nội dung gốc (trích):
-"${extracted.content}"
-
-Trả về JSON:
-{
-  "title": "tiêu đề mới hấp dẫn liên quan gà rutin, có keyword",
-  "content": "nội dung HTML hoàn chỉnh bằng tiếng Việt (dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>), tối thiểu 600 từ",
-  "excerpt": "tóm tắt 1-2 câu"
-}`,
-              },
-            ],
-            { maxTokens: 3000, temperature: 0.7, profile: 'quality' },
-          );
-          const rewritten = parseJsonFromAI(rewriteRaw, 'crawlToDrafts:rewrite');
-
-          // 5. Tối ưu nội dung
-          const improveRaw = await callLLM(
-            [
-              {
-                role: 'system',
-                content: `Bạn là chuyên gia biên tập nội dung cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản).
-NGUYÊN TẮC BẮT BUỘC:
-1. Giữ nguyên thông tin cốt lõi — KHÔNG bịa số liệu
-2. Thêm context thực tế: giá VND, kinh nghiệm nuôi gà rutin thực tế
-3. Thêm section FAQ cuối bài: ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn <p> trả lời ngắn
-4. Thêm link CTA tự nhiên <a href="/san-pham">xem sản phẩm</a>
-5. Nếu bài ngắn (< 800 từ): mở rộng các section hiện có
-6. Output PHẢI là HTML hợp lệ — KHÔNG dùng markdown
-
-FORMAT OUTPUT BẮT BUỘC:
-SUMMARY: [tóm tắt 1 dòng]
+FORMAT OUTPUT BẮT BUỘC (3 dòng delimiter, không thêm gì khác):
+TITLE: [tiêu đề mới hấp dẫn, có keyword]
 ===EXCERPT===
 [tóm tắt 1-2 câu hấp dẫn]
 ===HTML===
-[toàn bộ HTML nội dung đã cải thiện]`,
+[toàn bộ HTML nội dung bài viết]`,
               },
               {
                 role: 'user',
-                content: `Tiêu đề: ${rewritten.title}
+                content: `Viết bài cho website Gà Rutin.${categoryHint}${langNote}
 Keyword: "${activeKeyword.keyword}"
-Danh mục: ${activeKeyword.category ?? 'chung'}
-
-Nội dung HTML hiện tại:
-${rewritten.content}`,
+Tiêu đề gốc: "${extracted.title}"
+Mô tả gốc: "${extracted.excerpt}"
+Nội dung gốc:
+"${extracted.content}"`,
               },
             ],
-            { maxTokens: 6000, temperature: 0.4, profile: 'quality' },
+            { maxTokens: 4000, temperature: 0.7, profile: 'quality' },
           );
 
-          let improvedContent: string = rewritten.content;
-          let improvedExcerpt: string = rewritten.excerpt ?? '';
-          const htmlIdx = improveRaw.indexOf('===HTML===');
-          const excerptIdx = improveRaw.indexOf('===EXCERPT===');
-          if (htmlIdx !== -1) {
-            const htmlPart = improveRaw.slice(htmlIdx + '===HTML==='.length).trim()
-              .replace(/^```(?:html)?\s*/i, '').replace(/\s*```$/i, '').trim();
-            if (htmlPart) improvedContent = htmlPart;
-            if (excerptIdx !== -1 && excerptIdx < htmlIdx) {
-              const excerptPart = improveRaw.slice(excerptIdx + '===EXCERPT==='.length, htmlIdx).trim()
-                .replace(/<[^>]+>/g, '').trim();
-              if (excerptPart) improvedExcerpt = excerptPart;
-            }
-          }
+          // Parse delimiter format
+          const titleMatch = rewriteRaw.match(/^TITLE:\s*(.+)$/im);
+          const rewriteTitle = titleMatch?.[1]?.trim() ?? extracted.title;
+          const htmlDelim = '===HTML===';
+          const excerptDelim = '===EXCERPT===';
+          const hIdx = rewriteRaw.indexOf(htmlDelim);
+          const eIdx = rewriteRaw.indexOf(excerptDelim);
+          let improvedContent = hIdx !== -1
+            ? rewriteRaw.slice(hIdx + htmlDelim.length).trim().replace(/^```(?:html)?\s*/i, '').replace(/\s*```$/i, '').trim()
+            : extracted.content;
+          let improvedExcerpt = (eIdx !== -1 && hIdx !== -1 && eIdx < hIdx)
+            ? rewriteRaw.slice(eIdx + excerptDelim.length, hIdx).trim().replace(/<[^>]+>/g, '').trim()
+            : extracted.excerpt;
 
-          // 6. Tối ưu SEO
+          // 5. Tối ưu SEO
           const contentSnippet = improvedContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 3000);
           const seoRaw = await callLLM(
             [
@@ -491,7 +457,7 @@ Chỉ trả về JSON thuần: {"seoTitle":"...","seoDescription":"...","slug":"
               {
                 role: 'user',
                 content: `Keyword: "${activeKeyword.keyword}"
-Tiêu đề: ${rewritten.title}
+Tiêu đề: ${rewriteTitle}
 Nội dung: ${contentSnippet}`,
               },
             ],
@@ -506,7 +472,7 @@ Nội dung: ${contentSnippet}`,
           }
 
           // 7. Slug unique
-          let baseSlug = seo.slug || rewritten.title
+          let baseSlug = seo.slug || rewriteTitle
             .toLowerCase()
             .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .replace(/đ/g, 'd')
@@ -521,7 +487,7 @@ Nội dung: ${contentSnippet}`,
 
           // 8. Lưu draft gắn với keyword
           const post = this.repo.create({
-            title: rewritten.title,
+            title: rewriteTitle,
             slug,
             content: improvedContent,
             excerpt: improvedExcerpt,

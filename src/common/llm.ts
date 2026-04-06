@@ -163,7 +163,7 @@ const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'openrouter',
     url: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'meta-llama/llama-3.1-8b-instruct:free',
+    model: 'mistralai/mistral-7b-instruct:free',
     envKey: 'OPENROUTER_API_KEY',
   },
 ];
