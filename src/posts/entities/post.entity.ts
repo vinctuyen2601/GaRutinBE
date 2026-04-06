@@ -44,6 +44,9 @@ export class Post {
   @Column({ name: 'keyword_id', nullable: true })
   keywordId: string;
 
+  @Column({ name: 'source_url', nullable: true })
+  sourceUrl: string;
+
   @Column({ name: 'seo_score', type: 'int', nullable: true })
   seoScore: number;
 

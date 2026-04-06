@@ -1,11 +1,14 @@
 /**
- * Multi-provider LLM helper with automatic fallback.
+ * Multi-provider LLM helper with automatic fallback and key rotation.
  *
- * Supported env vars (add at least one):
- *   GROQ_API_KEY       — groq.com (free tier: ~1000 req/day, 30 req/min)
+ * Supported env vars (comma-separated for multiple keys):
+ *   GROQ_API_KEY       — groq.com (free tier: ~500 req/day, 6000 tok/min)
  *   GEMINI_API_KEY     — aistudio.google.com (free: 15 req/min, 1500 req/day)
  *   CEREBRAS_API_KEY   — inference.cerebras.ai (free tier)
  *   OPENROUTER_API_KEY — openrouter.ai (free models available)
+ *
+ * Multiple keys example:
+ *   GROQ_API_KEY=key1,key2,key3
  */
 
 /**
@@ -98,68 +101,131 @@ interface CallOptions {
   profile?: LLMProfile;
 }
 
-interface Provider {
+interface ProviderDef {
   name: string;
   url: string;
   model: string;
-  apiKey: () => string | undefined;
+  envKey: string;
 }
 
-const GROQ: Provider = {
-  name: 'groq',
-  url: 'https://api.groq.com/openai/v1/chat/completions',
-  model: 'llama-3.3-70b-versatile',
-  apiKey: () => process.env.GROQ_API_KEY,
-};
+// Cooldown tracking: key → timestamp khi hết cooldown
+const rateLimitCooldown = new Map<string, number>();
+const COOLDOWN_MS = 60_000; // 60 giây
 
-const GEMINI: Provider = {
-  name: 'gemini',
-  url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-  model: 'gemini-2.0-flash-lite',
-  apiKey: () => process.env.GEMINI_API_KEY,
-};
+function isRateLimited(key: string): boolean {
+  const until = rateLimitCooldown.get(key);
+  if (!until) return false;
+  if (Date.now() >= until) {
+    rateLimitCooldown.delete(key);
+    return false;
+  }
+  return true;
+}
 
-const CEREBRAS: Provider = {
-  name: 'cerebras',
-  url: 'https://api.cerebras.ai/v1/chat/completions',
-  model: 'llama-3.3-70b',
-  apiKey: () => process.env.CEREBRAS_API_KEY,
-};
+function markRateLimited(key: string): void {
+  rateLimitCooldown.set(key, Date.now() + COOLDOWN_MS);
+  console.warn(`[LLM] Key ...${key.slice(-6)} rate-limited, cooldown ${COOLDOWN_MS / 1000}s`);
+}
 
-const OPENROUTER: Provider = {
-  name: 'openrouter',
-  url: 'https://openrouter.ai/api/v1/chat/completions',
-  model: 'google/gemma-3-27b-it:free',
-  apiKey: () => process.env.OPENROUTER_API_KEY,
-};
+/** Parse comma-separated keys từ env var, lọc bỏ empty */
+function parseKeys(envValue: string | undefined): string[] {
+  if (!envValue) return [];
+  return envValue.split(',').map((k) => k.trim()).filter(Boolean);
+}
 
-const FAST_PROVIDERS: Provider[] = [GROQ, CEREBRAS, GEMINI, OPENROUTER];
-const QUALITY_PROVIDERS: Provider[] = [GEMINI, GROQ, CEREBRAS, OPENROUTER];
+const PROVIDER_DEFS: ProviderDef[] = [
+  {
+    name: 'groq',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile',
+    envKey: 'GROQ_API_KEY',
+  },
+  {
+    name: 'gemini',
+    url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    model: 'gemini-2.0-flash-lite',
+    envKey: 'GEMINI_API_KEY',
+  },
+  {
+    name: 'cerebras',
+    url: 'https://api.cerebras.ai/v1/chat/completions',
+    model: 'llama-3.3-70b',
+    envKey: 'CEREBRAS_API_KEY',
+  },
+  {
+    name: 'openrouter',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    model: 'google/gemma-3-27b-it:free',
+    envKey: 'OPENROUTER_API_KEY',
+  },
+];
+
+const FAST_ORDER = ['groq', 'cerebras', 'gemini', 'openrouter'];
+const QUALITY_ORDER = ['gemini', 'groq', 'cerebras', 'openrouter'];
+
+interface ProviderAttempt {
+  def: ProviderDef;
+  key: string;
+}
+
+/** Trả về danh sách (provider, key) theo thứ tự ưu tiên, bỏ qua key đang cooldown */
+function buildAttempts(profile: LLMProfile): ProviderAttempt[] {
+  const order = profile === 'quality' ? QUALITY_ORDER : FAST_ORDER;
+  const attempts: ProviderAttempt[] = [];
+
+  for (const name of order) {
+    const def = PROVIDER_DEFS.find((p) => p.name === name)!;
+    const keys = parseKeys(process.env[def.envKey]);
+    for (const key of keys) {
+      if (!isRateLimited(key)) {
+        attempts.push({ def, key });
+      }
+    }
+  }
+
+  // Nếu tất cả đều đang cooldown, thêm lại để thử (ít nhất còn cơ hội)
+  if (attempts.length === 0) {
+    for (const name of order) {
+      const def = PROVIDER_DEFS.find((p) => p.name === name)!;
+      const keys = parseKeys(process.env[def.envKey]);
+      for (const key of keys) {
+        attempts.push({ def, key });
+      }
+    }
+  }
+
+  return attempts;
+}
+
+/** Kiểm tra lỗi có phải rate limit / quota hết không */
+function isRateLimitError(status: number, body: string): boolean {
+  if (status === 429) return true;
+  if (status === 403 && body.includes('quota')) return true;
+  if (status === 400 && body.includes('rate')) return true;
+  return false;
+}
 
 export async function callLLM(
   messages: Message[],
   options: CallOptions = {},
 ): Promise<string> {
   const { maxTokens = 1024, temperature = 0.7, profile = 'fast' } = options;
-  const providers = profile === 'quality' ? QUALITY_PROVIDERS : FAST_PROVIDERS;
+  const attempts = buildAttempts(profile);
   const errors: string[] = [];
 
-  for (const provider of providers) {
-    const apiKey = provider.apiKey();
-    if (!apiKey) continue;
-
+  for (const { def, key } of attempts) {
     try {
-      const res = await fetch(provider.url, {
+      const res = await fetch(def.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          ...(provider.name === 'openrouter'
+          Authorization: `Bearer ${key}`,
+          ...(def.name === 'openrouter'
             ? { 'HTTP-Referer': 'https://garutin.com', 'X-Title': 'GaRutin' }
             : {}),
         },
         body: JSON.stringify({
-          model: provider.model,
+          model: def.model,
           messages,
           max_tokens: maxTokens,
           temperature,
@@ -168,6 +234,9 @@ export async function callLLM(
 
       if (!res.ok) {
         const errText = await res.text();
+        if (isRateLimitError(res.status, errText)) {
+          markRateLimited(key);
+        }
         throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
       }
 
@@ -176,11 +245,11 @@ export async function callLLM(
       if (!text) throw new Error('Empty response');
 
       if (errors.length > 0) {
-        console.log(`[LLM] Provider ${provider.name} succeeded after ${errors.length} failure(s)`);
+        console.log(`[LLM] ${def.name} ...${key.slice(-6)} succeeded after ${errors.length} failure(s)`);
       }
       return text;
     } catch (e: any) {
-      const msg = `[LLM] ${provider.name} failed: ${e.message}`;
+      const msg = `[LLM] ${def.name} ...${key.slice(-6)} failed: ${e.message}`;
       console.warn(msg);
       errors.push(msg);
     }

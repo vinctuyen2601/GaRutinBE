@@ -373,14 +373,20 @@ ${cleanContent}`;
       vi: 'tiếng Việt', ja: 'tiếng Nhật', ko: 'tiếng Hàn', en: 'tiếng Anh',
     };
 
-    await Promise.all(
-      searchResults.map(async ({ url, lang }) => {
-        try {
+    for (const { url, lang } of searchResults) {
+      try {
           // 3. Crawl & extract
+          // Kiểm tra URL này đã được crawl chưa
+          const existing = await this.repo.findOne({ where: { sourceUrl: url } });
+          if (existing) {
+            errors.push({ url, reason: `Đã crawl trước đó (bài: "${existing.title}")` });
+            continue;
+          }
+
           const extracted = await this.crawlerService.fetchAndExtract(url);
           if (!extracted || extracted.wordCount < 100) {
             errors.push({ url, reason: 'Trang không có đủ nội dung để xử lý' });
-            return;
+            continue;
           }
 
           // 4. AI viết lại theo góc nhìn Gà Rutin
@@ -524,6 +530,7 @@ Nội dung: ${contentSnippet}`,
             seoTitle: seo.seoTitle ?? '',
             seoDescription: seo.seoDescription ?? '',
             keywordId: activeKeyword.id,
+            sourceUrl: url,
             status: 'draft',
           });
           const saved = await this.repo.save(post);
@@ -531,8 +538,7 @@ Nội dung: ${contentSnippet}`,
         } catch (e: any) {
           errors.push({ url, reason: e.message ?? 'Lỗi không xác định' });
         }
-      }),
-    );
+    }
 
     // 9. Cập nhật thống kê keyword
     if (created.length > 0) {
