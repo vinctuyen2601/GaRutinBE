@@ -106,11 +106,14 @@ interface ProviderDef {
   url: string;
   model: string;
   envKey: string;
+  /** Một số model không hỗ trợ role "system" → merge vào user message đầu tiên */
+  mergeSystemIntoUser?: boolean;
 }
 
 // Cooldown tracking: key → timestamp khi hết cooldown
 const rateLimitCooldown = new Map<string, number>();
-const COOLDOWN_MS = 60_000; // 60 giây
+const COOLDOWN_TPM_MS  = 60_000;        // 60s  — rate limit per minute (Groq TPM)
+const COOLDOWN_QUOTA_MS = 6 * 3600_000; // 6h   — daily quota exhausted (Gemini)
 
 function isRateLimited(key: string): boolean {
   const until = rateLimitCooldown.get(key);
@@ -122,9 +125,14 @@ function isRateLimited(key: string): boolean {
   return true;
 }
 
-function markRateLimited(key: string): void {
-  rateLimitCooldown.set(key, Date.now() + COOLDOWN_MS);
-  console.warn(`[LLM] Key ...${key.slice(-6)} rate-limited, cooldown ${COOLDOWN_MS / 1000}s`);
+/** Phân biệt rate limit tạm thời vs quota ngày hết */
+function markRateLimited(key: string, body: string): void {
+  const isQuotaExhausted =
+    body.includes('exceeded your current quota') ||
+    body.includes('quota') && !body.includes('per minute') && !body.includes('per_minute');
+  const cooldownMs = isQuotaExhausted ? COOLDOWN_QUOTA_MS : COOLDOWN_TPM_MS;
+  rateLimitCooldown.set(key, Date.now() + cooldownMs);
+  console.warn(`[LLM] Key ...${key.slice(-6)} cooldown ${cooldownMs / 1000}s (${isQuotaExhausted ? 'quota exhausted' : 'TPM rate limit'})`);
 }
 
 /** Parse comma-separated keys từ env var, lọc bỏ empty */
@@ -149,13 +157,13 @@ const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'cerebras',
     url: 'https://api.cerebras.ai/v1/chat/completions',
-    model: 'llama-3.3-70b',
+    model: 'llama3.3-70b',
     envKey: 'CEREBRAS_API_KEY',
   },
   {
     name: 'openrouter',
     url: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'google/gemma-3-27b-it:free',
+    model: 'meta-llama/llama-3.1-8b-instruct:free',
     envKey: 'OPENROUTER_API_KEY',
   },
 ];
@@ -235,7 +243,7 @@ export async function callLLM(
       if (!res.ok) {
         const errText = await res.text();
         if (isRateLimitError(res.status, errText)) {
-          markRateLimited(key);
+          markRateLimited(key, errText);
         }
         throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
       }
