@@ -513,4 +513,24 @@ Nội dung: ${contentSnippet}`,
 
     return { keyword: activeKeyword.keyword, created, errors };
   }
+
+  async generateSitemap(): Promise<string> {
+    const siteUrl = process.env.SITE_URL || 'https://garutin.com';
+    const posts = await this.repo.find({
+      where: { status: 'published' },
+      select: ['slug', 'updatedAt'],
+      order: { updatedAt: 'DESC' },
+    });
+
+    const urls = posts.map((p) => `
+  <url>
+    <loc>${siteUrl}/blog/${p.slug}</loc>
+    <lastmod>${p.updatedAt.toISOString().split('T')[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`).join('');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}\n</urlset>`;
+  }
+
 }

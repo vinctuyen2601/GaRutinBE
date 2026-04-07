@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Header } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto, CrawlToDraftsDto } from './dto/ai-post.dto';
@@ -7,6 +7,19 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller()
 export class PostsController {
   constructor(private service: PostsService) {}
+
+  @Get('sitemap.xml')
+  @Header('Content-Type', 'application/xml; charset=utf-8')
+  getSitemap() {
+    return this.service.generateSitemap();
+  }
+
+  @Get('robots.txt')
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  getRobots() {
+    const siteUrl = process.env.SITE_URL || 'https://garutin.com';
+    return `User-agent: *\nAllow: /\nSitemap: ${siteUrl}/sitemap.xml\n`;
+  }
 
   @Get('posts')
   findAll(
