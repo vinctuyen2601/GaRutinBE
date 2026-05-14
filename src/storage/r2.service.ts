@@ -1,5 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import sharp from 'sharp';
+
+export interface UploadResult {
+  url: string;
+  key: string;
+  mimeType: string;
+  size: number;
+}
 
 @Injectable()
 export class R2Service {
@@ -22,18 +30,28 @@ export class R2Service {
     });
   }
 
-  async uploadBuffer(key: string, buffer: Buffer, contentType: string): Promise<string> {
+  async uploadBuffer(key: string, buffer: Buffer, contentType: string): Promise<UploadResult> {
+    let finalBuffer = buffer;
+    let finalKey = key;
+    let finalContentType = contentType;
+
+    if (contentType.startsWith('image/') && contentType !== 'image/gif') {
+      finalBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+      finalContentType = 'image/webp';
+      finalKey = key.replace(/\.[^.]+$/, '.webp');
+    }
+
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
+        Key: finalKey,
+        Body: finalBuffer,
+        ContentType: finalContentType,
       }),
     );
-    const url = `${this.publicUrl}/${key}`;
+    const url = `${this.publicUrl}/${finalKey}`;
     this.logger.log(`Uploaded: ${url}`);
-    return url;
+    return { url, key: finalKey, mimeType: finalContentType, size: finalBuffer.length };
   }
 
   async deleteObject(key: string): Promise<void> {

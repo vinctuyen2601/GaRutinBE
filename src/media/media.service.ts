@@ -13,13 +13,13 @@ export class MediaService {
   ) {}
 
   async upload(key: string, file: Express.Multer.File): Promise<MediaFile> {
-    const url = await this.r2.uploadBuffer(key, file.buffer, file.mimetype);
+    const { url, key: finalKey, mimeType, size } = await this.r2.uploadBuffer(key, file.buffer, file.mimetype);
     const record = this.repo.create({
       url,
-      key,
+      key: finalKey,
       originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
+      mimeType,
+      size,
     });
     return this.repo.save(record);
   }
