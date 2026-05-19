@@ -19,7 +19,7 @@ export class PostsService {
     private readonly keywordsService: KeywordsService,
   ) {}
 
-  findPublished(params: { category?: string; page?: number; limit?: number } = {}): Promise<Post[]> {
+  async findPublished(params: { category?: string; page?: number; limit?: number } = {}): Promise<{ data: Post[]; total: number; page: number; limit: number }> {
     const qb = this.repo.createQueryBuilder('p')
       .where(`p.status = 'published' AND p.deleted_at IS NULL`)
       .orderBy('p.published_at', 'DESC')
@@ -27,11 +27,12 @@ export class PostsService {
 
     if (params.category) qb.andWhere('p.category = :cat', { cat: params.category });
 
-    const limit = params.limit ?? 10;
+    const limit = params.limit ?? 12;
     const page = params.page ?? 1;
     qb.take(limit).skip((page - 1) * limit);
 
-    return qb.getMany();
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, page, limit };
   }
 
   findAllAdmin(): Promise<Post[]> {
