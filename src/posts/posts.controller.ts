@@ -26,11 +26,13 @@ export class PostsController {
     @Query('category') category?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('q') q?: string,
   ) {
     return this.service.findPublished({
       category,
       page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 10,
+      limit: limit ? parseInt(limit) : 12,
+      q: q?.trim() || undefined,
     });
   }
 

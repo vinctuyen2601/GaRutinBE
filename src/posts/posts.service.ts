@@ -19,13 +19,14 @@ export class PostsService {
     private readonly keywordsService: KeywordsService,
   ) {}
 
-  async findPublished(params: { category?: string; page?: number; limit?: number } = {}): Promise<{ data: Post[]; total: number; page: number; limit: number }> {
+  async findPublished(params: { category?: string; page?: number; limit?: number; q?: string } = {}): Promise<{ data: Post[]; total: number; page: number; limit: number }> {
     const qb = this.repo.createQueryBuilder('p')
       .where(`p.status = 'published' AND p.deleted_at IS NULL`)
       .orderBy('p.published_at', 'DESC')
       .addOrderBy('p.created_at', 'DESC');
 
     if (params.category) qb.andWhere('p.category = :cat', { cat: params.category });
+    if (params.q) qb.andWhere('(p.title ILIKE :q OR p.excerpt ILIKE :q)', { q: `%${params.q}%` });
 
     const limit = params.limit ?? 12;
     const page = params.page ?? 1;
