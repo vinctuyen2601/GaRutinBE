@@ -12,6 +12,7 @@ import { OrdersModule } from './orders/orders.module';
 import { MediaModule } from './media/media.module';
 import { GalleryModule } from './gallery/gallery.module';
 import { KeywordsModule } from './keywords/keywords.module';
+import { TrackingModule } from './tracking/tracking.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { KeywordsModule } from './keywords/keywords.module';
     MediaModule,
     GalleryModule,
     KeywordsModule,
+    TrackingModule,
   ],
 })
 export class AppModule {}
