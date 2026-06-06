@@ -29,10 +29,9 @@ export class TrackingController {
   getVisitTable(
     @Query('from') from?: string,
     @Query('to') to?: string,
-    @Query('platform') platform?: string,
     @Query('path') path?: string,
   ) {
-    return this.service.getVisitTable({ from, to, platform, path });
+    return this.service.getVisitTable({ from, to, path });
   }
 
   @UseGuards(JwtAuthGuard)

@@ -43,15 +43,9 @@ export class TrackingService {
       return qb;
     };
 
-    const [totalRaw, uniqueRaw, byPlatform, timelineRaw] = await Promise.all([
+    const [totalRaw, uniqueRaw, timelineRaw] = await Promise.all([
       buildBase().select('COUNT(*)', 'total').getRawOne<{ total: string }>(),
       buildBase().select('COUNT(DISTINCT v.ip)', 'unique').getRawOne<{ unique: string }>(),
-      buildBase()
-        .select('v.platform', 'platform')
-        .addSelect('COUNT(*)', 'visits')
-        .groupBy('v.platform')
-        .orderBy('visits', 'DESC')
-        .getRawMany<{ platform: string; visits: string }>(),
       buildBase()
         .select("TO_CHAR(v.created_at, 'YYYY-MM-DD')", 'date')
         .addSelect('COUNT(*)', 'visits')
@@ -64,7 +58,6 @@ export class TrackingService {
     return {
       total: Number(totalRaw?.total ?? 0),
       uniqueVisitors: Number(uniqueRaw?.unique ?? 0),
-      byPlatform: byPlatform.map(r => ({ platform: r.platform, visits: Number(r.visits) })),
       timeline: timelineRaw.map(r => ({
         date: r.date,
         visits: Number(r.visits),
@@ -73,24 +66,21 @@ export class TrackingService {
     };
   }
 
-  async getVisitTable(opts: { from?: string; to?: string; platform?: string; path?: string }) {
+  async getVisitTable(opts: { from?: string; to?: string; path?: string }) {
     const qb = this.visitRepo.createQueryBuilder('v')
       .select('v.path', 'path')
-      .addSelect('v.platform', 'platform')
       .addSelect('COUNT(*)', 'visits')
       .addSelect('COUNT(DISTINCT v.ip)', 'unique_visitors')
-      .groupBy('v.path, v.platform')
+      .groupBy('v.path')
       .orderBy('visits', 'DESC');
 
     if (opts.from) qb.andWhere('v.created_at >= :from', { from: opts.from });
     if (opts.to) qb.andWhere('v.created_at <= :to', { to: opts.to + 'T23:59:59' });
-    if (opts.platform) qb.andWhere('v.platform = :platform', { platform: opts.platform });
     if (opts.path) qb.andWhere('v.path ILIKE :path', { path: `%${opts.path}%` });
 
-    const rows = await qb.getRawMany<{ path: string; platform: string; visits: string; unique_visitors: string }>();
+    const rows = await qb.getRawMany<{ path: string; visits: string; unique_visitors: string }>();
     return rows.map(r => ({
       path: r.path,
-      platform: r.platform,
       visits: Number(r.visits),
       uniqueVisitors: Number(r.unique_visitors),
     }));
