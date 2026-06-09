@@ -7,6 +7,9 @@ import { Product } from '../products/entities/product.entity';
 
 const PLATFORMS: Platform[] = ['facebook', 'youtube', 'tiktok', 'zalo', 'web', 'other'];
 
+const dateStart = (d: string) => d + 'T00:00:00+07:00';
+const dateEnd   = (d: string) => d + 'T23:59:59+07:00';
+
 @Injectable()
 export class TrackingService {
   constructor(
@@ -38,8 +41,8 @@ export class TrackingService {
   async getVisitStats(from?: string, to?: string) {
     const buildBase = () => {
       const qb = this.visitRepo.createQueryBuilder('v');
-      if (from) qb.andWhere('v.created_at >= :from', { from });
-      if (to) qb.andWhere('v.created_at <= :to', { to: to + 'T23:59:59' });
+      if (from) qb.andWhere('v.created_at >= :from', { from: dateStart(from) });
+      if (to) qb.andWhere('v.created_at <= :to', { to: dateEnd(to) });
       return qb;
     };
 
@@ -74,8 +77,8 @@ export class TrackingService {
       .groupBy('v.path')
       .orderBy('visits', 'DESC');
 
-    if (opts.from) qb.andWhere('v.created_at >= :from', { from: opts.from });
-    if (opts.to) qb.andWhere('v.created_at <= :to', { to: opts.to + 'T23:59:59' });
+    if (opts.from) qb.andWhere('v.created_at >= :from', { from: dateStart(opts.from) });
+    if (opts.to) qb.andWhere('v.created_at <= :to', { to: dateEnd(opts.to) });
     if (opts.path) qb.andWhere('v.path ILIKE :path', { path: `%${opts.path}%` });
 
     const rows = await qb.getRawMany<{ path: string; visits: string; unique_visitors: string }>();
@@ -92,8 +95,8 @@ export class TrackingService {
     const buildBase = () => {
       const qb = this.orderRepo.createQueryBuilder('o')
         .where("o.status != 'cancelled'");
-      if (from) qb.andWhere('o.created_at >= :from', { from });
-      if (to) qb.andWhere('o.created_at <= :to', { to: to + 'T23:59:59' });
+      if (from) qb.andWhere('o.created_at >= :from', { from: dateStart(from) });
+      if (to) qb.andWhere('o.created_at <= :to', { to: dateEnd(to) });
       return qb;
     };
 
@@ -105,8 +108,8 @@ export class TrackingService {
       this.orderRepo.createQueryBuilder('o')
         .select('o.status', 'status')
         .addSelect('COUNT(*)', 'count')
-        .where(from ? 'o.created_at >= :from' : '1=1', from ? { from } : {})
-        .andWhere(to ? 'o.created_at <= :to' : '1=1', to ? { to: to + 'T23:59:59' } : {})
+        .where(from ? 'o.created_at >= :from' : '1=1', from ? { from: dateStart(from) } : {})
+        .andWhere(to ? 'o.created_at <= :to' : '1=1', to ? { to: dateEnd(to) } : {})
         .groupBy('o.status')
         .getRawMany<{ status: string; count: string }>(),
       buildBase()
@@ -156,7 +159,7 @@ export class TrackingService {
       GROUP BY item->>'productId', item->>'name', item->>'unit'
       ORDER BY total_qty DESC
       LIMIT $3
-    `, [from, to + 'T23:59:59', limit]);
+    `, [dateStart(from), dateEnd(to), limit]);
 
     return rows.map((r: any) => ({
       productId: r.product_id,
@@ -210,8 +213,8 @@ export class TrackingService {
         .select('v.path', 'path')
         .addSelect('COUNT(*)', 'visits')
         .where("v.path LIKE '/san-pham/%'")
-        .andWhere('v.created_at >= :from', { from })
-        .andWhere('v.created_at <= :to', { to: to + 'T23:59:59' })
+        .andWhere('v.created_at >= :from', { from: dateStart(from) })
+        .andWhere('v.created_at <= :to', { to: dateEnd(to) })
         .groupBy('v.path')
         .getRawMany<{ path: string; visits: string }>(),
       this.orderRepo.query(`
@@ -224,7 +227,7 @@ export class TrackingService {
           AND o.created_at >= $1
           AND o.created_at <= $2
         GROUP BY item->>'productId'
-      `, [from, to + 'T23:59:59']),
+      `, [dateStart(from), dateEnd(to)]),
     ]);
 
     const visitsBySlug: Record<string, number> = {};
