@@ -27,6 +27,12 @@ export class OrdersController {
     });
   }
 
+  @Get('admin/orders/by-phone/:phone')
+  @UseGuards(JwtAuthGuard)
+  findByPhone(@Param('phone') phone: string) {
+    return this.service.findByPhone(phone);
+  }
+
   @Get('admin/orders/:id')
   @UseGuards(JwtAuthGuard)
   findById(@Param('id') id: string) {

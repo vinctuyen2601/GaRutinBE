@@ -3,12 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
+import { CustomersService } from '../customers/customers.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(Order)
     private readonly repo: Repository<Order>,
+    private readonly customersService: CustomersService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -19,6 +21,10 @@ export class OrdersService {
   }
 
   async create(dto: CreateOrderDto): Promise<Order> {
+    if (dto.customerPhone) {
+      await this.customersService.upsert(dto.customerPhone, dto.customerName, dto.customerAddress);
+    }
+
     const totalAmount = dto.totalAmount ??
       dto.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
@@ -40,6 +46,13 @@ export class OrdersService {
     qb.take(limit).skip((page - 1) * limit);
 
     return qb.getMany();
+  }
+
+  findByPhone(phone: string): Promise<Order[]> {
+    return this.repo.find({
+      where: { customerPhone: phone },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async findById(id: string): Promise<Order> {

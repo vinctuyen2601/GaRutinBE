@@ -13,6 +13,7 @@ import { MediaModule } from './media/media.module';
 import { GalleryModule } from './gallery/gallery.module';
 import { KeywordsModule } from './keywords/keywords.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { TrackingModule } from './tracking/tracking.module';
     GalleryModule,
     KeywordsModule,
     TrackingModule,
+    CustomersModule,
   ],
 })
 export class AppModule {}
