@@ -28,7 +28,7 @@ export class ProductsService {
     const qb = this.repo
       .createQueryBuilder('p')
       .where('p.is_active = true AND p.deleted_at IS NULL')
-      .orderBy('p.sort_order', 'ASC')
+      .orderBy('p.sort_order', 'DESC')
       .addOrderBy('p.created_at', 'DESC');
 
     if (params.categoryId)
@@ -45,7 +45,7 @@ export class ProductsService {
   findAllAdmin(): Promise<Product[]> {
     return this.repo.find({
       withDeleted: false,
-      order: { sortOrder: 'ASC', createdAt: 'DESC' },
+      order: { sortOrder: 'DESC', createdAt: 'DESC' },
     });
   }
 
