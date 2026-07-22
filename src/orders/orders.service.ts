@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { CustomersService } from '../customers/customers.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class OrdersService {
@@ -11,6 +12,7 @@ export class OrdersService {
     @InjectRepository(Order)
     private readonly repo: Repository<Order>,
     private readonly customersService: CustomersService,
+    private readonly mailService: MailService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -34,7 +36,11 @@ export class OrdersService {
       totalAmount,
       source: dto.source ?? 'web',
     });
-    return this.repo.save(order);
+    const saved = await this.repo.save(order);
+
+    this.mailService.sendNewOrderAlert(saved).catch(() => {});
+
+    return saved;
   }
 
   findAll(params: { status?: string; page?: number; limit?: number } = {}): Promise<Order[]> {

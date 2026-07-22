@@ -20,6 +20,12 @@ export class SiteConfigController {
     return this.service.findAll();
   }
 
+  @Get('admin/site-config')
+  @UseGuards(JwtAuthGuard)
+  findAllAdmin() {
+    return this.service.findAllAdmin();
+  }
+
   @Patch('admin/site-config')
   @UseGuards(JwtAuthGuard)
   update(@Body() dto: UpdateSiteConfigDto) {
