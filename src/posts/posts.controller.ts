@@ -3,6 +3,7 @@ import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto, CrawlToDraftsDto } from './dto/ai-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { POST_TEMPLATES } from './post-templates';
 
 @Controller()
 export class PostsController {
@@ -45,6 +46,12 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   findAllAdmin() {
     return this.service.findAllAdmin();
+  }
+
+  @Get('admin/posts/templates')
+  @UseGuards(JwtAuthGuard)
+  findTemplates() {
+    return POST_TEMPLATES.map(({ id, name, description }) => ({ id, name, description }));
   }
 
   @Post('admin/posts')

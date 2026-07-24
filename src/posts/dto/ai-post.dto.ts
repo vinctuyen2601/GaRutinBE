@@ -35,6 +35,10 @@ export class OptimizeSeoDto {
   @IsArray()
   @IsOptional()
   tags?: string[];
+
+  @IsString()
+  @IsOptional()
+  templateId?: string;
 }
 
 export class GenerateFromUrlDto {
@@ -70,4 +74,8 @@ export class ImproveContentDto {
   @IsArray()
   @IsOptional()
   issues?: string[];
+
+  @IsString()
+  @IsOptional()
+  templateId?: string;
 }

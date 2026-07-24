@@ -8,6 +8,7 @@ import { callLLM, parseJsonFromAI } from '../common/llm';
 import { CrawlerService } from './crawler.service';
 import { SearchService } from './search.service';
 import { KeywordsService } from '../keywords/keywords.service';
+import { POST_TEMPLATES, getPostTemplate } from './post-templates';
 
 @Injectable()
 export class PostsService {
@@ -217,6 +218,11 @@ Trả về JSON với cấu trúc:
       .trim()
       .slice(0, 3000);
 
+    const template = getPostTemplate(dto.templateId);
+    const templateNote = template
+      ? `\n- Bài viết đang theo cấu trúc "${template.name}" (${template.description}) — manualSuggestions PHẢI phù hợp với cấu trúc này, KHÔNG đề xuất thêm FAQ nếu cấu trúc này không cần FAQ, không đề xuất CTA cứng nếu cấu trúc yêu cầu CTA lồng tự nhiên`
+      : '';
+
     const systemPrompt = `Bạn là chuyên gia SEO cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản), trứng cút, kỹ thuật chăn nuôi.
 Nhiệm vụ: Tối ưu hóa metadata SEO cho bài viết, giúp rank cao trên Google Việt Nam.
 
@@ -225,7 +231,7 @@ Quy tắc NGHIÊM NGẶT:
 - seoDescription: 145-158 ký tự — cấu trúc: Hook(vấn đề người dùng) + Giải pháp ngắn + CTA (Khám phá/Tìm hiểu ngay). KHÔNG bắt đầu bằng "Bài viết" hay "Chúng tôi"
 - slug: 3-6 từ tiếng Việt không dấu, có từ khóa chính, chỉ a-z0-9 và dấu gạch ngang, không có "bai-viet" hay "huong-dan" ở đầu
 - tags: mảng 5-7 tags — 2 broad keyword ngắn (1-2 từ) + 3-4 long-tail keyword (3-5 từ) — là những gì người Việt hay tìm trên Google về gà rutin
-- manualSuggestions: mảng gợi ý cụ thể cần chỉnh tay — ưu tiên: (1) thêm internal link đến /san-pham hoặc /blog/category/X với anchor text tự nhiên, (2) thêm H3 câu hỏi "?" + đoạn trả lời ngắn để có FAQ schema, (3) bổ sung số liệu/thống kê cụ thể về gà rutin
+- manualSuggestions: mảng gợi ý cụ thể cần chỉnh tay — ưu tiên: (1) thêm internal link đến /san-pham hoặc /blog/category/X với anchor text tự nhiên, (2) thêm H3 câu hỏi "?" + đoạn trả lời ngắn để có FAQ schema, (3) bổ sung số liệu/thống kê cụ thể về gà rutin${templateNote}
 - suggestions: mô tả ngắn những thay đổi AI đã thực hiện
 
 Chỉ trả về JSON thuần (không markdown):
@@ -275,19 +281,24 @@ Thông tin hiện tại (có thể rỗng):
       ? `Điểm chất lượng hiện tại: ${dto.contentScore}/100.\n`
       : '';
 
+    const template = getPostTemplate(dto.templateId);
+    const structureRule = template
+      ? `4. ${template.brief}`
+      : `4. Nếu thiếu FAQ: thêm section cuối bài với ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn trả lời <p> ngắn
+5. Nếu thiếu CTA: thêm link tự nhiên <a href="/san-pham">xem sản phẩm</a> hoặc đề cập "Gà Rutin"
+6. Nếu thiếu internal link: thêm ít nhất 1 <a href="/blog/...">bài liên quan</a> phù hợp ngữ cảnh`;
+
     const systemPrompt = `Bạn là chuyên gia biên tập nội dung cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản).
 Nhiệm vụ: Cải thiện bài viết HTML để tăng điểm chất lượng nội dung, giúp rank tốt hơn trên Google Việt Nam.
 
 NGUYÊN TẮC BẮT BUỘC:
 1. Fix TOÀN BỘ các vấn đề được liệt kê trong danh sách
-2. Giữ nguyên thông tin cốt lõi, cấu trúc bài — KHÔNG bịa số liệu hay thông tin không có trong bài gốc
+2. Giữ nguyên thông tin cốt lõi — KHÔNG bịa số liệu hay thông tin không có trong bài gốc
 3. Thêm context thực tế: giá VND (200k, 500k...), địa danh VN, mùa vụ, kinh nghiệm nuôi gà rutin thực tế
-4. Nếu thiếu FAQ: thêm section cuối bài với ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn trả lời <p> ngắn
-5. Nếu thiếu CTA: thêm link tự nhiên <a href="/san-pham">xem sản phẩm</a> hoặc đề cập "Gà Rutin"
-6. Nếu thiếu internal link: thêm ít nhất 1 <a href="/blog/...">bài liên quan</a> phù hợp ngữ cảnh
+${structureRule}
 7. Giọng văn: thân thiện, chuyên môn — phù hợp người nuôi gia cầm Việt Nam
 8. Nếu bài ngắn (< 800 từ): mở rộng các section hiện có, KHÔNG thêm nội dung vô nghĩa
-9. Output PHẢI là HTML hợp lệ (<h2>, <h3>, <p>, <ul>, <ol>, <li>, <a>, <strong>) — KHÔNG dùng markdown
+9. Output PHẢI là HTML hợp lệ (<h2>, <h3>, <p>, <ul>, <ol>, <li>, <a>, <strong>, <table> nếu cần) — KHÔNG dùng markdown
 
 FORMAT OUTPUT BẮT BUỘC (giữ đúng 3 dòng delimiter):
 SUMMARY: [một dòng tóm tắt những gì đã thêm/sửa, ví dụ: Đã thêm FAQ 3 câu, +400 từ, CTA /san-pham, 1 internal link]
