@@ -174,10 +174,22 @@ export class TrackingService {
   // ── Monthly compare ───────────────────────────────────────────────────────────
 
   async getMonthlyCompare() {
-    const now = new Date();
-    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    // Dùng Intl với timeZone cố định thay vì Date.getFullYear()/getMonth() —
+    // 2 hàm đó đọc theo giờ hệ thống server (thường UTC), sai lệch với giờ VN
+    // trong vài tiếng đầu mỗi tháng mới.
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: 'numeric',
+    }).formatToParts(new Date());
+    const year = Number(parts.find((p) => p.type === 'year')!.value);
+    const monthNum = Number(parts.find((p) => p.type === 'month')!.value);
+
+    const month = `${year}-${String(monthNum).padStart(2, '0')}`;
+    const prevTotal = year * 12 + (monthNum - 1) - 1;
+    const prevYear = Math.floor(prevTotal / 12);
+    const prevMonthNum = (prevTotal % 12) + 1;
+    const prevMonth = `${prevYear}-${String(prevMonthNum).padStart(2, '0')}`;
 
     const getStats = async (ym: string) => {
       const raw = await this.orderRepo.createQueryBuilder('o')
