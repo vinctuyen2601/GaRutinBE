@@ -50,10 +50,10 @@ export class TrackingService {
       buildBase().select('COUNT(*)', 'total').getRawOne<{ total: string }>(),
       buildBase().select('COUNT(DISTINCT v.ip)', 'unique').getRawOne<{ unique: string }>(),
       buildBase()
-        .select("TO_CHAR(v.created_at, 'YYYY-MM-DD')", 'date')
+        .select("TO_CHAR(v.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')", 'date')
         .addSelect('COUNT(*)', 'visits')
         .addSelect('COUNT(DISTINCT v.ip)', 'unique_visitors')
-        .groupBy("TO_CHAR(v.created_at, 'YYYY-MM-DD')")
+        .groupBy("TO_CHAR(v.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')")
         .orderBy('date', 'ASC')
         .getRawMany<{ date: string; visits: string; unique_visitors: string }>(),
     ]);
@@ -119,10 +119,10 @@ export class TrackingService {
         .groupBy('o.source')
         .getRawMany<{ source: string; count: string; revenue: string }>(),
       buildBase()
-        .select("TO_CHAR(o.created_at, 'YYYY-MM-DD')", 'date')
+        .select("TO_CHAR(o.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')", 'date')
         .addSelect('COUNT(*)', 'orders')
         .addSelect('COALESCE(SUM(o.total_amount), 0)', 'revenue')
-        .groupBy("TO_CHAR(o.created_at, 'YYYY-MM-DD')")
+        .groupBy("TO_CHAR(o.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD')")
         .orderBy('date', 'ASC')
         .getRawMany<{ date: string; orders: string; revenue: string }>(),
     ]);
@@ -184,7 +184,7 @@ export class TrackingService {
         .select('COUNT(*)', 'orders')
         .addSelect('COALESCE(SUM(o.total_amount), 0)', 'revenue')
         .where("o.status != 'cancelled'")
-        .andWhere("TO_CHAR(o.created_at, 'YYYY-MM') = :ym", { ym })
+        .andWhere("TO_CHAR(o.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM') = :ym", { ym })
         .getRawOne<{ orders: string; revenue: string }>();
       return { orders: Number(raw?.orders ?? 0), revenue: Number(raw?.revenue ?? 0) };
     };
