@@ -17,6 +17,14 @@ export class MailService {
   }
 
   async sendNewOrderAlert(order: Order): Promise<void> {
+    try {
+      await this.doSendNewOrderAlert(order);
+    } catch (err) {
+      this.logger.error(`Gửi email cảnh báo đơn hàng thất bại: ${(err as Error).message}`, (err as Error).stack);
+    }
+  }
+
+  private async doSendNewOrderAlert(order: Order): Promise<void> {
     if (!this.resend) {
       this.logger.warn('RESEND_API_KEY chưa cấu hình — bỏ qua gửi email cảnh báo đơn hàng');
       return;
@@ -68,15 +76,14 @@ export class MailService {
       </div>
     `;
 
-    try {
-      await this.resend.emails.send({
-        from,
-        to,
-        subject: `🔔 Đơn hàng mới #${order.orderNumber} — ${fmtVND(order.totalAmount)}`,
-        html,
-      });
-    } catch (err) {
-      this.logger.error(`Gửi email cảnh báo đơn hàng thất bại: ${(err as Error).message}`);
+    const { error } = await this.resend.emails.send({
+      from,
+      to,
+      subject: `🔔 Đơn hàng mới #${order.orderNumber} — ${fmtVND(order.totalAmount)}`,
+      html,
+    });
+    if (error) {
+      throw new Error(`Resend API error (${error.name}): ${error.message}`);
     }
   }
 }
