@@ -24,7 +24,8 @@ jobs:
             cd GaRutinBE
             git pull
             rm -f tsconfig.build.tsbuildinfo
-            npm install
+            rm -rf node_modules
+            npm ci
             npm run build
             pm2 restart garutin-be
             pm2 save
