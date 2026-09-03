@@ -20,6 +20,10 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Dừng ngay khi một lệnh lỗi. Không có dòng này thì migration
+            # hỏng vẫn đi tiếp tới pm2 restart và máy chủ chạy với schema
+            # sai — đúng sự cố khi thêm cột products.video_url.
+            set -e
             export PATH=/home/ubuntu/.nvm/versions/node/v23.11.1/bin:$PATH
             cd GaRutinBE
             git pull
@@ -27,6 +31,13 @@ jobs:
             rm -rf node_modules
             npm ci
             npm run build
+            # Migration chạy TRƯỚC khi khởi động lại, không phải sau.
+            # Thứ tự này an toàn một chiều: schema mới + mã cũ thì mã cũ
+            # chỉ bỏ qua cột mới; ngược lại — mã mới + schema cũ — API chết.
+            #
+            # Dùng bản đã biên dịch chứ không dùng migration:run: lệnh đó
+            # cần ts-node, mà ts-node ở devDependencies nên không chắc có.
+            npm run migration:run:prod
             pm2 restart garutin-be
             pm2 save
             sleep 3
