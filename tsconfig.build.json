@@ -1,4 +1,8 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+  // scripts/ phải nằm ngoài bản build. tsconfig không khai rootDir nên tsc tự
+  // suy ra thư mục gốc chung; thêm một tệp .ts ngoài src/ là gốc nhảy lên thư
+  // mục dự án, dist/main.js dời sang dist/src/main.js và pm2 không tìm thấy —
+  // API chết mà biên dịch vẫn báo thành công. Đã xảy ra thật ở 17Fishing.
+  "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"]
 }

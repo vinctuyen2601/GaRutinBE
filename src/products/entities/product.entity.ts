@@ -47,6 +47,13 @@ export class Product {
   @Column({ name: 'sort_order', default: 0 })
   sortOrder: number;
 
+  /**
+   * Video của lứa hàng đang bán. Link YouTube hoặc đường dẫn mp4 tự lưu — web
+   * tự phân biệt và hiển thị khác nhau.
+   */
+  @Column({ name: 'video_url', nullable: true })
+  videoUrl: string;
+
   @Column({ name: 'seo_title', nullable: true })
   seoTitle: string;
 

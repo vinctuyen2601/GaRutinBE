@@ -54,6 +54,11 @@ export class CreateProductDto {
   @Type(() => Number)
   sortOrder?: number;
 
+  /** Link YouTube hoặc đường dẫn mp4 tự lưu. Web tự phân biệt. */
+  @IsString()
+  @IsOptional()
+  videoUrl?: string;
+
   @IsString()
   @IsOptional()
   seoTitle?: string;
@@ -118,6 +123,11 @@ export class UpdateProductDto {
   @IsOptional()
   @Type(() => Number)
   sortOrder?: number;
+
+  /** Link YouTube hoặc đường dẫn mp4 tự lưu. Web tự phân biệt. */
+  @IsString()
+  @IsOptional()
+  videoUrl?: string;
 
   @IsString()
   @IsOptional()

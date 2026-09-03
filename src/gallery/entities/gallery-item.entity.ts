@@ -23,6 +23,16 @@ export class GalleryItem {
   @Column({ name: 'customer_name', nullable: true })
   customerName: string;
 
+  /**
+   * Ngày QUAY, không phải ngày đăng.
+   *
+   * Video trang trại mất giá trị rất nhanh — khách nhìn "quay năm ngoái" là
+   * nghi đàn đã bán hết. created_at không thay được: có clip quay hôm nay mà
+   * tuần sau mới đăng.
+   */
+  @Column({ name: 'filmed_at', type: 'date', nullable: true })
+  filmedAt: string | null;
+
   @Column({ name: 'sort_order', default: 0 })
   sortOrder: number;
 

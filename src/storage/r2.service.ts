@@ -47,6 +47,14 @@ export class R2Service {
         Key: finalKey,
         Body: finalBuffer,
         ContentType: finalContentType,
+        /**
+         * Hạn dùng lại một năm. Tên tệp có mốc thời gian nên không bao giờ bị
+         * ghi đè bằng nội dung khác — đặt immutable là an toàn.
+         *
+         * Quan trọng với video hơn ảnh nhiều: không có header này thì mỗi lần
+         * khách mở lại trang là tải lại cả tệp vài megabyte.
+         */
+        CacheControl: 'public, max-age=31536000, immutable',
       }),
     );
     const url = `${this.publicUrl}/${finalKey}`;
