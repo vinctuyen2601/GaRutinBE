@@ -57,15 +57,37 @@ export class ProductsService {
     return this.repo.findOne({ where: { id } });
   }
 
+  /**
+   * Gộp trường videoUrl cũ (một video) vào mảng videos, rồi loại nó khỏi
+   * payload.
+   *
+   * Cần loại hẳn chứ không chỉ bỏ qua: `Object.assign(product, dto)` bên dưới
+   * sẽ gắn videoUrl thành một thuộc tính rác trên entity, và TypeORM không có
+   * cột tương ứng nên hoặc lỗi hoặc âm thầm trôi vào bản ghi.
+   *
+   * Chỉ dùng videoUrl khi videos KHÔNG được gửi lên. CMS mới luôn gửi videos
+   * (kể cả mảng rỗng khi xoá hết), nên điều kiện này để bản CMS mới không bị
+   * bản cũ ghi đè ngược.
+   */
+  private chuanHoaVideo<T extends { videos?: string[]; videoUrl?: string }>(
+    dto: T,
+  ): Omit<T, 'videoUrl'> {
+    const { videoUrl, ...rest } = dto;
+    if (videoUrl && rest.videos === undefined) {
+      return { ...rest, videos: [videoUrl] } as Omit<T, 'videoUrl'>;
+    }
+    return rest as Omit<T, 'videoUrl'>;
+  }
+
   async create(dto: CreateProductDto): Promise<Product> {
-    const product = this.repo.create(dto);
+    const product = this.repo.create(this.chuanHoaVideo(dto));
     return this.repo.save(product);
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<Product> {
     const product = await this.findById(id);
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
-    Object.assign(product, dto);
+    Object.assign(product, this.chuanHoaVideo(dto));
     return this.repo.save(product);
   }
 

@@ -54,7 +54,18 @@ export class CreateProductDto {
   @Type(() => Number)
   sortOrder?: number;
 
-  /** Link YouTube hoặc đường dẫn mp4 tự lưu. Web tự phân biệt. */
+  /** Link YouTube hoặc đường dẫn mp4 tự lưu. Web tự phân biệt từng phần tử. */
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  videos?: string[];
+
+  /**
+   * @deprecated Dùng `videos`. Giữ lại vì CMS trên Vercel deploy tách khỏi máy
+   * chủ: có vài phút bản CMS cũ (ô video đơn) gọi API mới, mà API bật
+   * forbidNonWhitelisted nên từ chối trường lạ — chủ trại sẽ không lưu được
+   * sản phẩm trong khoảng đó. Service gộp giá trị này vào `videos`.
+   */
   @IsString()
   @IsOptional()
   videoUrl?: string;
@@ -124,7 +135,18 @@ export class UpdateProductDto {
   @Type(() => Number)
   sortOrder?: number;
 
-  /** Link YouTube hoặc đường dẫn mp4 tự lưu. Web tự phân biệt. */
+  /** Link YouTube hoặc đường dẫn mp4 tự lưu. Web tự phân biệt từng phần tử. */
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  videos?: string[];
+
+  /**
+   * @deprecated Dùng `videos`. Giữ lại vì CMS trên Vercel deploy tách khỏi máy
+   * chủ: có vài phút bản CMS cũ (ô video đơn) gọi API mới, mà API bật
+   * forbidNonWhitelisted nên từ chối trường lạ — chủ trại sẽ không lưu được
+   * sản phẩm trong khoảng đó. Service gộp giá trị này vào `videos`.
+   */
   @IsString()
   @IsOptional()
   videoUrl?: string;

@@ -48,11 +48,18 @@ export class Product {
   sortOrder: number;
 
   /**
-   * Video của lứa hàng đang bán. Link YouTube hoặc đường dẫn mp4 tự lưu — web
-   * tự phân biệt và hiển thị khác nhau.
+   * Video của lứa hàng đang bán. Mỗi phần tử là link YouTube hoặc đường dẫn
+   * mp4 tự lưu — web tự phân biệt và hiển thị khác nhau.
+   *
+   * Tách khỏi `images` chứ không trộn chung: 13 chỗ đang đọc `images` đều giả
+   * định đó là ảnh, nặng nhất là feed Google Merchant (<g:image_link>) — lọt
+   * một URL video vào đó là Google từ chối sản phẩm. Xem migration 012.
+   *
+   * Thứ tự hiển thị: video trước rồi mới tới ảnh. Video là thứ giữ mắt khách
+   * lại; để sau thì phần lớn không cuộn tới.
    */
-  @Column({ name: 'video_url', nullable: true })
-  videoUrl: string;
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  videos: string[];
 
   @Column({ name: 'seo_title', nullable: true })
   seoTitle: string;
