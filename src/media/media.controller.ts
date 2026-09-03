@@ -29,11 +29,22 @@ export class MediaController {
    * video 200 MB là 200 MB bộ nhớ máy chủ cho đúng một yêu cầu. Vài người tải
    * cùng lúc là máy chủ chết.
    *
-   * 25 MB đủ cho ảnh và cho clip ngắn 10–15 giây đã nén. Video dài hơn thì
+   * Con số 18 MB không phải chọn bừa: nginx trước ứng dụng đặt
+   * client_max_body_size 20m, đo thật trên máy chủ — tệp 20.000.000 byte qua
+   * được, đúng 20 MiB thì trả 413. Vượt ngưỡng đó là nginx chặn TRƯỚC khi
+   * yêu cầu tới đây, và khách thấy trang lỗi thô của nginx chứ không thấy câu
+   * báo lỗi tử tế nào.
+   *
+   * Chừa 2 MB dưới ngưỡng cho phần bao multipart và các trường đi kèm.
+   *
+   * Muốn nhận tệp lớn hơn thì phải nới client_max_body_size trước, rồi mới
+   * nâng số ở đây — nâng riêng bên này chỉ tạo ra lời hứa mà nginx không giữ.
+   *
+   * 18 MB đủ cho ảnh và cho clip ngắn 10–15 giây đã nén. Video dài hơn thì
    * đăng YouTube rồi dán link — vừa không tốn bộ nhớ máy chủ, vừa chạy mượt
    * trên 4G nhờ YouTube tự nén nhiều mức chất lượng.
    */
-  static readonly TOI_DA = 25 * 1024 * 1024;
+  static readonly TOI_DA = 18 * 1024 * 1024;
 
   /**
    * Chỉ nhận ảnh và video.
