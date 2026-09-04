@@ -35,6 +35,14 @@ export class Product {
   @Column({ default: 'con' })
   unit: string;
 
+  /** Điểm trung bình từ đánh giá ĐÃ DUYỆT. NULL khi chưa có đánh giá nào. */
+  @Column({ name: 'avg_rating', type: 'decimal', precision: 3, scale: 2, nullable: true })
+  avgRating: number | null;
+
+  /** Số đánh giá đã duyệt. */
+  @Column({ name: 'review_count', type: 'int', default: 0 })
+  reviewCount: number;
+
   @Column({ name: 'stock_status', default: 'in_stock' })
   stockStatus: 'in_stock' | 'out_of_stock' | 'pre_order';
 

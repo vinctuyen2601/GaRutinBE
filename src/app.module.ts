@@ -14,6 +14,7 @@ import { MediaModule } from './media/media.module';
 import { GalleryModule } from './gallery/gallery.module';
 import { KeywordsModule } from './keywords/keywords.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { CustomersModule } from './customers/customers.module';
 
@@ -51,6 +52,7 @@ import { CustomersModule } from './customers/customers.module';
     TrackingModule,
     CustomersModule,
     NotificationsModule,
+    ReviewsModule,
   ],
 })
 export class AppModule {}

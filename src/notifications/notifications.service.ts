@@ -266,6 +266,35 @@ export class NotificationsService {
     }).catch(() => {});
   }
 
+  /**
+   * Đánh giá mới của khách, luôn ở trạng thái chờ duyệt.
+   *
+   * Không có thông báo thì đánh giá nằm im trong CMS cho tới khi ai đó tình cờ
+   * mở mục Đánh giá — mà khách gửi xong đang chờ nó xuất hiện trên trang.
+   */
+  @OnEvent('review.created')
+  onReviewCreated(review: any) {
+    const so = Number(review.rating);
+    const sao = Number.isFinite(so) && so > 0 ? '⭐'.repeat(Math.min(Math.floor(so), 5)) : '—';
+
+    const msg = [
+      `⭐ <b>Đánh giá mới — chờ duyệt</b>`,
+      review.productName ? `Sản phẩm: <b>${esc(review.productName)}</b>` : null,
+      `👤 ${esc(review.customerName) || '—'}`,
+      `Chấm: ${sao} (${esc(review.rating)}/5)`,
+      review.comment ? `💬 "${esc(review.comment)}"` : null,
+      (review.images?.length || review.video)
+        ? `📎 ${review.images?.length || 0} ảnh${review.video ? ' + 1 video' : ''}`
+        : null,
+      `\n<a href="${cmsLink('/reviews')}">Duyệt đánh giá</a>`,
+    ].filter(v => v !== null).join('\n');
+
+    this.dispatch('review.created', capLength(msg), {
+      subject: `⭐ Đánh giá mới chờ duyệt${review.productName ? ` — ${review.productName}` : ''}`,
+      html: textToHtml(capLength(msg)),
+    }).catch(() => {});
+  }
+
   @OnEvent('order.status_updated')
   onOrderStatusUpdated(order: any) {
     const to = STATUS_LABELS[order.status] ?? order.status;
