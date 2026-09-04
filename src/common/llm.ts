@@ -42,9 +42,18 @@ function fixJsonStringNewlines(raw: string): string {
     }
 
     if (inString) {
-      if (ch === '\n') { result += '\\n'; continue; }
-      if (ch === '\r') { result += '\\r'; continue; }
-      if (ch === '\t') { result += '\\t'; continue; }
+      if (ch === '\n') {
+        result += '\\n';
+        continue;
+      }
+      if (ch === '\r') {
+        result += '\\r';
+        continue;
+      }
+      if (ch === '\t') {
+        result += '\\t';
+        continue;
+      }
     }
 
     result += ch;
@@ -78,13 +87,21 @@ export function parseJsonFromAI<T = any>(text: string, context?: string): T {
 
   for (const candidate of candidates) {
     // Thử parse thẳng
-    try { return JSON.parse(candidate); } catch {}
+    try {
+      return JSON.parse(candidate);
+    } catch {}
     // Thử sau khi fix newlines bên trong strings
-    try { return JSON.parse(fixJsonStringNewlines(candidate)); } catch {}
+    try {
+      return JSON.parse(fixJsonStringNewlines(candidate));
+    } catch {}
   }
 
   // Không parse được — log để debug
-  console.error(`[LLM] JSON parse failed${context ? ` (${context})` : ''}. Response preview:\n${text.slice(0, 400)}`);
+  console.error(
+    `[LLM] JSON parse failed${
+      context ? ` (${context})` : ''
+    }. Response preview:\n${text.slice(0, 400)}`,
+  );
   throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
 }
 
@@ -112,7 +129,7 @@ interface ProviderDef {
 
 // Cooldown tracking: key → timestamp khi hết cooldown
 const rateLimitCooldown = new Map<string, number>();
-const COOLDOWN_TPM_MS  = 60_000;        // 60s  — rate limit per minute (Groq TPM)
+const COOLDOWN_TPM_MS = 60_000; // 60s  — rate limit per minute (Groq TPM)
 const COOLDOWN_QUOTA_MS = 6 * 3600_000; // 6h   — daily quota exhausted (Gemini)
 
 function isRateLimited(key: string): boolean {
@@ -129,29 +146,38 @@ function isRateLimited(key: string): boolean {
 function markRateLimited(key: string, body: string): void {
   const isQuotaExhausted =
     body.includes('exceeded your current quota') ||
-    body.includes('quota') && !body.includes('per minute') && !body.includes('per_minute');
+    (body.includes('quota') &&
+      !body.includes('per minute') &&
+      !body.includes('per_minute'));
   const cooldownMs = isQuotaExhausted ? COOLDOWN_QUOTA_MS : COOLDOWN_TPM_MS;
   rateLimitCooldown.set(key, Date.now() + cooldownMs);
-  console.warn(`[LLM] Key ...${key.slice(-6)} cooldown ${cooldownMs / 1000}s (${isQuotaExhausted ? 'quota exhausted' : 'TPM rate limit'})`);
+  console.warn(
+    `[LLM] Key ...${key.slice(-6)} cooldown ${cooldownMs / 1000}s (${
+      isQuotaExhausted ? 'quota exhausted' : 'TPM rate limit'
+    })`,
+  );
 }
 
 /** Parse comma-separated keys từ env var, lọc bỏ empty */
 function parseKeys(envValue: string | undefined): string[] {
   if (!envValue) return [];
-  return envValue.split(',').map((k) => k.trim()).filter(Boolean);
+  return envValue
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
 }
 
 const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama-3.3-70b-specdec',
     envKey: 'GROQ_API_KEY',
   },
   {
     name: 'gemini',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    model: 'gemini-2.0-flash-lite',
+    model: 'gemini-2.5-flash',
     envKey: 'GEMINI_API_KEY',
   },
   {
@@ -253,7 +279,11 @@ export async function callLLM(
       if (!text) throw new Error('Empty response');
 
       if (errors.length > 0) {
-        console.log(`[LLM] ${def.name} ...${key.slice(-6)} succeeded after ${errors.length} failure(s)`);
+        console.log(
+          `[LLM] ${def.name} ...${key.slice(-6)} succeeded after ${
+            errors.length
+          } failure(s)`,
+        );
       }
       return text;
     } catch (e: any) {
