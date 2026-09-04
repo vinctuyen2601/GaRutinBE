@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Order } from './entities/order.entity';
 import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
 import { CustomersService } from '../customers/customers.service';
-import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class OrdersService {
@@ -12,7 +12,7 @@ export class OrdersService {
     @InjectRepository(Order)
     private readonly repo: Repository<Order>,
     private readonly customersService: CustomersService,
-    private readonly mailService: MailService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private generateOrderNumber(): string {
@@ -38,7 +38,10 @@ export class OrdersService {
     });
     const saved = await this.repo.save(order);
 
-    this.mailService.sendNewOrderAlert(saved).catch(() => {});
+    // Phát sự kiện thay vì gọi thẳng dịch vụ gửi mail: từ nay chủ trại tự
+    // khai kênh nhận (Telegram / Zalo / Email) trong CMS, và một đơn có thể
+    // báo về nhiều nơi cùng lúc. Gửi thất bại không được làm hỏng việc tạo đơn.
+    this.eventEmitter.emit('order.created', saved);
 
     return saved;
   }
@@ -69,7 +72,15 @@ export class OrdersService {
 
   async updateStatus(id: string, dto: UpdateOrderStatusDto): Promise<Order> {
     const order = await this.findById(id);
+    // Giữ lại trạng thái cũ TRƯỚC khi ghi đè: thông báo hiển thị "cũ → mới",
+    // đọc sau khi gán thì hai đầu mũi tên giống hệt nhau.
+    const previousStatus = order.status;
     order.status = dto.status;
-    return this.repo.save(order);
+    const saved = await this.repo.save(order);
+
+    if (previousStatus !== saved.status) {
+      this.eventEmitter.emit('order.status_updated', { ...saved, previousStatus });
+    }
+    return saved;
   }
 }

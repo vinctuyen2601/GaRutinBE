@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
@@ -13,6 +14,7 @@ import { MediaModule } from './media/media.module';
 import { GalleryModule } from './gallery/gallery.module';
 import { KeywordsModule } from './keywords/keywords.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { CustomersModule } from './customers/customers.module';
 
 @Module({
@@ -34,6 +36,7 @@ import { CustomersModule } from './customers/customers.module';
       poolSize: process.env.NODE_ENV === 'production' ? 4 : 10,
       connectTimeoutMS: 10000,
     }),
+    EventEmitterModule.forRoot(),
     AuthModule,
     UsersModule,
     StorageModule,
@@ -47,6 +50,7 @@ import { CustomersModule } from './customers/customers.module';
     KeywordsModule,
     TrackingModule,
     CustomersModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
