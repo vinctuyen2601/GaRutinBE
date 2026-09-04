@@ -89,8 +89,8 @@ export class ReviewsService {
     });
   }
 
-  /** Quản trị: xem tất cả, lọc theo trạng thái duyệt. */
-  async findAllForAdmin(trangThai?: 'pending' | 'approved'): Promise<any[]> {
+  /** Quản trị: xem tất cả, lọc theo trạng thái duyệt và/hoặc theo sản phẩm. */
+  async findAllForAdmin(trangThai?: 'pending' | 'approved', productId?: string): Promise<any[]> {
     const qb = this.repo
       .createQueryBuilder('r')
       .leftJoin(Product, 'p', 'p.id = r.product_id')
@@ -98,8 +98,9 @@ export class ReviewsService {
       .orderBy('r.created_at', 'DESC')
       .limit(300);
 
-    if (trangThai === 'pending') qb.where('r.is_approved = false');
-    if (trangThai === 'approved') qb.where('r.is_approved = true');
+    if (trangThai === 'pending') qb.andWhere('r.is_approved = false');
+    if (trangThai === 'approved') qb.andWhere('r.is_approved = true');
+    if (productId) qb.andWhere('r.product_id = :productId', { productId });
 
     const rows = await qb.getRawAndEntities();
     return rows.entities.map((e, i) => ({
@@ -107,6 +108,27 @@ export class ReviewsService {
       productName: rows.raw[i]?.product_name ?? null,
       productSlug: rows.raw[i]?.product_slug ?? null,
     }));
+  }
+
+  /**
+   * Quản trị nhập tay một đánh giá, duyệt luôn.
+   *
+   * Dùng để chép lại lời khen khách nhắn qua Zalo hoặc điện thoại — những phản
+   * hồi có thật nhưng không đi qua form trên web. KHÔNG đặt `ip`, nên nó không
+   * chiếm mất suất gửi của khách thật ở địa chỉ nào cả.
+   */
+  async adminCreate(dto: CreateReviewDto): Promise<Review> {
+    const sanPham = await this.productRepo.findOne({ where: { id: dto.productId } });
+    if (!sanPham) throw new NotFoundException('Sản phẩm không tồn tại');
+    const review = await this.repo.save(this.repo.create({
+      ...dto,
+      images: dto.images ?? [],
+      video: dto.video ?? null,
+      isApproved: true,
+      ip: null,
+    } as any)) as unknown as Review;
+    await this.capNhatThongKe(dto.productId).catch(() => {});
+    return review;
   }
 
   async update(id: string, dto: UpdateReviewDto): Promise<Review> {

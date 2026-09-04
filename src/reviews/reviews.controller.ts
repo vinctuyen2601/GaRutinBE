@@ -134,8 +134,18 @@ export class ReviewsController {
 
   @Get('admin/reviews')
   @UseGuards(JwtAuthGuard)
-  findAllForAdmin(@Query('status') status?: 'pending' | 'approved') {
-    return this.svc.findAllForAdmin(status);
+  findAllForAdmin(
+    @Query('status') status?: 'pending' | 'approved',
+    @Query('productId') productId?: string,
+  ) {
+    return this.svc.findAllForAdmin(status, productId);
+  }
+
+  /** Quản trị nhập tay một đánh giá (chép từ Zalo/điện thoại), duyệt luôn. */
+  @Post('admin/reviews')
+  @UseGuards(JwtAuthGuard)
+  adminCreate(@Body() dto: CreateReviewDto) {
+    return this.svc.adminCreate(dto);
   }
 
   @Get('admin/reviews/pending-count')
