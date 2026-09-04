@@ -168,7 +168,15 @@ export class TrackingService {
    */
   async getProductFunnel(from?: string, to?: string) {
     const params: unknown[] = [];
-    const vConds = [`v.is_bot = false`, `v.path LIKE '/san-pham/%'`];
+    // `visitor_id IS NOT NULL` là điều kiện QUAN TRỌNG NHẤT ở đây, không phải
+    // để lọc rác mà để cả bốn cột phễu cùng nói về một thời kỳ.
+    //
+    // Migration đặt event='view' cho MỌI dòng cũ, và dòng cũ không có
+    // visitor_id nên rơi về IP — thành ra lượt truy cập từ nhiều tháng trước
+    // vẫn được đếm là "khách xem", trong khi "thêm giỏ" chỉ có từ lúc bật đo.
+    // Hệ quả: mọi sản phẩm đều hiện "xem 3, thêm giỏ 0" và trông như trang sản
+    // phẩm hỏng, dù thực ra chỉ là hai cột đo hai khoảng thời gian khác nhau.
+    const vConds = [`v.is_bot = false`, `v.path LIKE '/san-pham/%'`, `v.visitor_id IS NOT NULL`];
     const oConds = [`o.status <> 'cancelled'`, `(i->>'productId') IS NOT NULL`];
     if (from) {
       params.push(dateStart(from));
@@ -184,10 +192,10 @@ export class TrackingService {
     const rows = await this.visitRepo.query(
       `WITH traffic AS (
          SELECT split_part(split_part(substring(v.path from 11), '?', 1), '#', 1) AS slug,
-                COUNT(DISTINCT CASE WHEN v.event = 'view' THEN COALESCE(v.visitor_id, v.ip) END) AS viewers,
+                COUNT(DISTINCT CASE WHEN v.event = 'view' THEN v.visitor_id END) AS viewers,
                 COUNT(*) FILTER (WHERE v.event = 'add_to_cart') AS cart_events,
-                COUNT(DISTINCT CASE WHEN v.event = 'add_to_cart' THEN COALESCE(v.visitor_id, v.ip) END) AS carters,
-                COUNT(DISTINCT CASE WHEN v.event = 'begin_checkout' THEN COALESCE(v.visitor_id, v.ip) END) AS checkouters
+                COUNT(DISTINCT CASE WHEN v.event = 'add_to_cart' THEN v.visitor_id END) AS carters,
+                COUNT(DISTINCT CASE WHEN v.event = 'begin_checkout' THEN v.visitor_id END) AS checkouters
            FROM page_visits v
           WHERE ${vConds.join(' AND ')}
           GROUP BY 1
@@ -195,6 +203,11 @@ export class TrackingService {
        sales AS (
          SELECT p.slug AS slug,
                 COUNT(DISTINCT o.id) AS orders,
+                -- Chỉ đếm đơn NỐI ĐƯỢC với người xem. Đơn chốt qua Zalo/điện
+                -- thoại và đơn đặt trước khi bật đo đều không có visitor_id;
+                -- COUNT(DISTINCT NULL) = 0 nên chúng không lọt vào đây. Bên
+                -- CMS dựa vào "buyers = 0 nhưng đã bán > 0" để hiện dấu "—"
+                -- thay vì "0%" — hai thứ đó nghĩa hoàn toàn khác nhau.
                 COUNT(DISTINCT o.visitor_id) AS buyers,
                 COALESCE(SUM((i->>'quantity')::numeric), 0) AS quantity_sold,
                 COALESCE(SUM((i->>'price')::numeric * (i->>'quantity')::numeric), 0) AS revenue
