@@ -171,13 +171,13 @@ const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.1-8b-instant',
+    model: 'llama-3.3-70b-versatile',
     envKey: 'GROQ_API_KEY',
   },
   {
     name: 'gemini',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.5-flash',
     envKey: 'GEMINI_API_KEY',
   },
   {
@@ -189,7 +189,7 @@ const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'openrouter',
     url: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'meta-llama/llama-3.3-70b-instruct:free',
+    model: 'google/gemini-2.5-flash:free',
     envKey: 'OPENROUTER_API_KEY',
   },
 ];
