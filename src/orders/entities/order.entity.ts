@@ -40,6 +40,10 @@ export class Order {
   @Column({ default: 'web' })
   source: 'web' | 'zalo' | 'phone' | 'other';
 
+  /** Nối đơn với người đã xem trang, để đếm được số người mua. */
+  @Column({ name: 'visitor_id', type: 'varchar', length: 64, nullable: true })
+  visitorId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

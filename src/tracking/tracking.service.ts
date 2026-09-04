@@ -26,13 +26,24 @@ export class TrackingService {
     path: string;
     ip?: string;
     userAgent?: string;
+    event?: string;
+    visitorId?: string;
+    isBot?: boolean;
   }): Promise<void> {
     const platform = (PLATFORMS.includes(dto.platform as Platform) ? dto.platform : 'other') as Platform;
+    // Chỉ nhận đúng bốn bước của phễu. Giá trị lạ do khách tự gửi mà lọt vào
+    // thì bảng phễu sinh ra những dòng không ai hiểu, và lượt xem bị mất khỏi
+    // thống kê cũ vì không còn là 'view'.
+    const event = ['view', 'add_to_cart', 'begin_checkout', 'purchase']
+      .includes(dto.event ?? '') ? (dto.event as string) : 'view';
     await this.visitRepo.save(this.visitRepo.create({
       platform,
       path: dto.path,
       ip: dto.ip || null,
       userAgent: dto.userAgent || null,
+      event,
+      visitorId: dto.visitorId?.slice(0, 64) || null,
+      isBot: dto.isBot ?? false,
     }));
   }
 
@@ -125,6 +136,93 @@ export class TrackingService {
       visits: Number(vMap.get(b)?.visits ?? 0),
       visitors: Number(vMap.get(b)?.visitors ?? 0),
       orders: oMap.get(b) ?? 0,
+    }));
+  }
+
+  /**
+   * Phễu theo từng sản phẩm: xem → thêm giỏ → vào đặt hàng → mua.
+   *
+   * Đọc theo chiều rơi rụng: xem nhiều mà thêm giỏ ít là vấn đề ở trang sản
+   * phẩm (ảnh, mô tả, giá). Thêm giỏ nhiều mà vào đặt hàng ít là vướng ở giỏ.
+   * Vào đặt hàng rồi mà không thành đơn là vướng ở chính khâu đặt hàng.
+   *
+   * Đếm số NGƯỜI (visitor_id) chứ không phải số lượt, trừ cột "lượt thêm giỏ" —
+   * một người thêm giỏ ba lần là ba lần muốn mua, đáng biết, nhưng vẫn chỉ là
+   * một người.
+   *
+   * Bỏ bot: bot đọc trang sản phẩm rất nhiều nhưng không bao giờ thêm giỏ, để
+   * lẫn vào thì mọi sản phẩm đều trông như "xem nhiều, mua ít".
+   *
+   * Đường dẫn sản phẩm dạng /san-pham/<slug>; substring(path from 11) cắt đúng
+   * mười ký tự đầu, rồi bỏ phần ?query và #hash để hai lượt vào cùng một sản
+   * phẩm không bị đếm thành hai dòng.
+   */
+  async getProductFunnel(from?: string, to?: string) {
+    const params: unknown[] = [];
+    const vConds = [`v.is_bot = false`, `v.path LIKE '/san-pham/%'`];
+    const oConds = [`o.status <> 'cancelled'`, `(i->>'productId') IS NOT NULL`];
+    if (from) {
+      params.push(dateStart(from));
+      vConds.push(`v.created_at >= $${params.length}`);
+      oConds.push(`o.created_at >= $${params.length}`);
+    }
+    if (to) {
+      params.push(dateEnd(to));
+      vConds.push(`v.created_at <= $${params.length}`);
+      oConds.push(`o.created_at <= $${params.length}`);
+    }
+
+    const rows = await this.visitRepo.query(
+      `WITH traffic AS (
+         SELECT split_part(split_part(substring(v.path from 11), '?', 1), '#', 1) AS slug,
+                COUNT(DISTINCT CASE WHEN v.event = 'view' THEN COALESCE(v.visitor_id, v.ip) END) AS viewers,
+                COUNT(*) FILTER (WHERE v.event = 'add_to_cart') AS cart_events,
+                COUNT(DISTINCT CASE WHEN v.event = 'add_to_cart' THEN COALESCE(v.visitor_id, v.ip) END) AS carters,
+                COUNT(DISTINCT CASE WHEN v.event = 'begin_checkout' THEN COALESCE(v.visitor_id, v.ip) END) AS checkouters
+           FROM page_visits v
+          WHERE ${vConds.join(' AND ')}
+          GROUP BY 1
+       ),
+       sales AS (
+         SELECT p.slug AS slug,
+                COUNT(DISTINCT o.id) AS orders,
+                COUNT(DISTINCT o.visitor_id) AS buyers,
+                COALESCE(SUM((i->>'quantity')::numeric), 0) AS quantity_sold,
+                COALESCE(SUM((i->>'price')::numeric * (i->>'quantity')::numeric), 0) AS revenue
+           FROM orders o
+           CROSS JOIN LATERAL jsonb_array_elements(o.items) AS i
+           JOIN products p ON p.id::text = i->>'productId'
+          WHERE ${oConds.join(' AND ')}
+          GROUP BY p.slug
+       )
+       SELECT p.slug AS slug,
+              p.name AS name,
+              COALESCE(t.viewers, 0)       AS viewers,
+              COALESCE(t.cart_events, 0)   AS cart_events,
+              COALESCE(t.carters, 0)       AS carters,
+              COALESCE(t.checkouters, 0)   AS checkouters,
+              COALESCE(s.quantity_sold, 0) AS quantity_sold,
+              COALESCE(s.orders, 0)        AS orders,
+              COALESCE(s.buyers, 0)        AS buyers,
+              COALESCE(s.revenue, 0)       AS revenue
+         FROM products p
+         LEFT JOIN traffic t ON t.slug = p.slug
+         LEFT JOIN sales s   ON s.slug = p.slug
+        ORDER BY viewers DESC, quantity_sold DESC`,
+      params,
+    );
+
+    return rows.map((r: Record<string, string>) => ({
+      slug: r.slug,
+      name: r.name,
+      viewers: Number(r.viewers),
+      cartEvents: Number(r.cart_events),
+      carters: Number(r.carters),
+      checkouters: Number(r.checkouters),
+      quantitySold: Number(r.quantity_sold),
+      orders: Number(r.orders),
+      buyers: Number(r.buyers),
+      revenue: Number(r.revenue),
     }));
   }
 

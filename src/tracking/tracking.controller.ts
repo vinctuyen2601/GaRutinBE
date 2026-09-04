@@ -2,6 +2,7 @@ import { Controller, Post, Body, Get, Query, Req, UseGuards } from '@nestjs/comm
 import { Request } from 'express';
 import { TrackingService } from './tracking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { isBotUserAgent } from './user-agent';
 
 @Controller()
 export class TrackingController {
@@ -9,12 +10,21 @@ export class TrackingController {
 
   @Post('track')
   async track(
-    @Body() body: { platform?: string; path: string },
+    @Body() body: { platform?: string; path: string; event?: string; visitorId?: string },
     @Req() req: Request,
   ) {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip;
     const userAgent = req.headers['user-agent'] || '';
-    await this.service.track({ platform: body.platform || 'web', path: body.path, ip, userAgent });
+    await this.service.track({
+      platform: body.platform || 'web',
+      path: body.path,
+      ip,
+      userAgent,
+      event: body.event,
+      visitorId: body.visitorId,
+      // Nhận diện phía máy chủ chứ không tin phía gửi: bot không tự khai là bot.
+      isBot: isBotUserAgent(userAgent),
+    });
     return { ok: true };
   }
 
@@ -32,6 +42,13 @@ export class TrackingController {
     @Query('path') path?: string,
   ) {
     return this.service.getVisitTable({ from, to, path });
+  }
+
+  /* Phễu theo từng sản phẩm: xem → thêm giỏ → vào đặt hàng → mua */
+  @UseGuards(JwtAuthGuard)
+  @Get('admin/analytics/product-funnel')
+  getProductFunnel(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.service.getProductFunnel(from, to);
   }
 
   /* Khách ghé thăm vào khung giờ nào trong ngày */

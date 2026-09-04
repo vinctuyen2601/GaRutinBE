@@ -16,6 +16,17 @@ export class PageVisit {
   @Column({ nullable: true })
   ip: string;
 
+  /** Bước trong phễu: view | add_to_cart | begin_checkout. */
+  @Column({ default: 'view' })
+  event: string;
+
+  /** Mã người xem do trình duyệt sinh, để đếm số NGƯỜI thay vì số lượt. */
+  @Column({ name: 'visitor_id', type: 'varchar', length: 64, nullable: true })
+  visitorId: string | null;
+
+  @Column({ name: 'is_bot', default: false })
+  isBot: boolean;
+
   @Column({ name: 'user_agent', nullable: true })
   userAgent: string;
 

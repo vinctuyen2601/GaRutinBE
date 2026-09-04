@@ -49,6 +49,10 @@ export class CreateOrderDto {
   @IsIn(['web', 'zalo', 'phone', 'other'])
   @IsOptional()
   source?: 'web' | 'zalo' | 'phone' | 'other';
+
+  @IsOptional()
+  @IsString()
+  visitorId?: string;
 }
 
 export class UpdateOrderStatusDto {
