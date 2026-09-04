@@ -69,6 +69,65 @@ export class TrackingService {
     };
   }
 
+  /**
+   * Khách ghé thăm vào những khung giờ nào trong ngày.
+   *
+   * Để trại biết lúc nào nên đăng bài, chạy quảng cáo và trực Zalo. Đăng lúc
+   * không ai online thì bài chìm mất trước khi có người thấy.
+   *
+   * Chia sáu khung ĐỀU NHAU bốn tiếng, không chia theo "sáng/trưa/chiều" dài
+   * ngắn khác nhau: khung 2 tiếng và khung 5 tiếng đặt cạnh nhau thì con số
+   * không so sánh được, mà bảng lại trông như so sánh được.
+   *
+   * Chỉ MỘT lần `AT TIME ZONE 'Asia/Ho_Chi_Minh'` vì cả page_visits.created_at
+   * lẫn orders.created_at ở đây đều là TIMESTAMPTZ (đã kiểm bằng
+   * information_schema) — Postgres tự biết mốc UTC, đổi thẳng sang giờ Việt là
+   * đủ. Lưu ý: bên 17Fishing cột này là TIMESTAMP trần lưu giờ UTC nên phải đổi
+   * hai bước; chép qua chép lại giữa hai dự án là lệch đúng 7 tiếng mà bảng
+   * vẫn trông rất hợp lý.
+   *
+   * Đơn hàng gom theo giờ của CHÍNH nó, không truy ngược về lượt xem dẫn tới
+   * đơn: câu hỏi ở đây là "khách đặt hàng vào lúc nào", để biết lúc nào cần
+   * người trực điện thoại.
+   */
+  async getHourStats(from?: string, to?: string) {
+    const GIO_VN = `AT TIME ZONE 'Asia/Ho_Chi_Minh'`;
+
+    const visitQb = this.visitRepo.createQueryBuilder('v')
+      .select(`FLOOR(EXTRACT(HOUR FROM v.created_at ${GIO_VN}) / 4)::int`, 'bucket')
+      .addSelect('COUNT(*)', 'visits')
+      .addSelect('COUNT(DISTINCT v.ip)', 'visitors')
+      .groupBy('1');
+    if (from) visitQb.andWhere('v.created_at >= :from', { from: dateStart(from) });
+    if (to) visitQb.andWhere('v.created_at <= :to', { to: dateEnd(to) });
+
+    const orderQb = this.orderRepo.createQueryBuilder('o')
+      .select(`FLOOR(EXTRACT(HOUR FROM o.created_at ${GIO_VN}) / 4)::int`, 'bucket')
+      .addSelect('COUNT(*)', 'orders')
+      .where("o.status != 'cancelled'")
+      .groupBy('1');
+    if (from) orderQb.andWhere('o.created_at >= :from', { from: dateStart(from) });
+    if (to) orderQb.andWhere('o.created_at <= :to', { to: dateEnd(to) });
+
+    const [visits, orders] = await Promise.all([
+      visitQb.getRawMany<{ bucket: number; visits: string; visitors: string }>(),
+      orderQb.getRawMany<{ bucket: number; orders: string }>(),
+    ]);
+
+    const vMap = new Map(visits.map(r => [Number(r.bucket), r]));
+    const oMap = new Map(orders.map(r => [Number(r.bucket), Number(r.orders)]));
+
+    // Luôn trả đủ sáu khung kể cả khung không có ai: khung vắng cũng là thông
+    // tin, và bảng thiếu dòng thì người đọc tưởng chưa có dữ liệu.
+    return Array.from({ length: 6 }, (_, b) => ({
+      bucket: b,
+      label: `${String(b * 4).padStart(2, '0')}–${String(b * 4 + 4).padStart(2, '0')}h`,
+      visits: Number(vMap.get(b)?.visits ?? 0),
+      visitors: Number(vMap.get(b)?.visitors ?? 0),
+      orders: oMap.get(b) ?? 0,
+    }));
+  }
+
   async getVisitTable(opts: { from?: string; to?: string; path?: string }) {
     const qb = this.visitRepo.createQueryBuilder('v')
       .select('v.path', 'path')

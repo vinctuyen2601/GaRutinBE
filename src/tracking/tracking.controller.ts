@@ -34,6 +34,13 @@ export class TrackingController {
     return this.service.getVisitTable({ from, to, path });
   }
 
+  /* Khách ghé thăm vào khung giờ nào trong ngày */
+  @UseGuards(JwtAuthGuard)
+  @Get('admin/analytics/hours')
+  getHourStats(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.service.getHourStats(from, to);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('admin/analytics/orders')
   getOrderStats(@Query('from') from?: string, @Query('to') to?: string) {
