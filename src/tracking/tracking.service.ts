@@ -156,6 +156,15 @@ export class TrackingService {
    * Đường dẫn sản phẩm dạng /san-pham/<slug>; substring(path from 11) cắt đúng
    * mười ký tự đầu, rồi bỏ phần ?query và #hash để hai lượt vào cùng một sản
    * phẩm không bị đếm thành hai dòng.
+   *
+   * Bỏ hẳn sản phẩm KHÔNG có hoạt động nào — không ai xem và cũng không bán
+   * được món nào. Trại có nhiều sản phẩm, để cả dòng toàn số 0 thì phải đọc
+   * lướt qua chúng mỗi lần muốn tìm món đang có chuyện.
+   *
+   * Vẫn GIỮ sản phẩm không có lượt xem nhưng đã bán được. Nghe mâu thuẫn nhưng
+   * xảy ra thật: đơn chốt qua Zalo hoặc điện thoại không sinh lượt xem nào, và
+   * đơn đặt trước khi bật đo hành vi cũng vậy. Ẩn những dòng đó là giấu mất
+   * doanh thu có thật khỏi bảng.
    */
   async getProductFunnel(from?: string, to?: string) {
     const params: unknown[] = [];
@@ -208,6 +217,7 @@ export class TrackingService {
          FROM products p
          LEFT JOIN traffic t ON t.slug = p.slug
          LEFT JOIN sales s   ON s.slug = p.slug
+        WHERE COALESCE(t.viewers, 0) > 0 OR COALESCE(s.quantity_sold, 0) > 0
         ORDER BY viewers DESC, quantity_sold DESC`,
       params,
     );
