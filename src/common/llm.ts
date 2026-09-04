@@ -171,19 +171,19 @@ const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-specdec',
+    model: 'llama-3.3-70b-versatile',
     envKey: 'GROQ_API_KEY',
   },
   {
     name: 'gemini',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.6-flash',
     envKey: 'GEMINI_API_KEY',
   },
   {
     name: 'cerebras',
     url: 'https://api.cerebras.ai/v1/chat/completions',
-    model: 'llama3.3-70b',
+    model: 'llama3.1-8b',
     envKey: 'CEREBRAS_API_KEY',
   },
   {
