@@ -10,30 +10,6 @@ import { SearchService } from './search.service';
 import { KeywordsService } from '../keywords/keywords.service';
 import { POST_TEMPLATES, getPostTemplate } from './post-templates';
 
-/**
- * Tách JSON ra khỏi câu trả lời của AI.
- *
- * Không gọi thẳng JSON.parse được: dù prompt đã dặn "chỉ trả JSON thuần", mô
- * hình vẫn hay gói thêm thứ khác quanh nó — rào ```json, một câu dẫn kiểu "Đây
- * là kết quả:", hoặc phần suy luận của các mô hình reasoning như gpt-oss. Cách
- * cũ chỉ bóc rào ở đúng đầu và cuối chuỗi nên gặp mấy trường hợp đó là hỏng.
- *
- * Cắt từ dấu { đầu tiên tới dấu } cuối cùng thì bỏ qua được hết phần thừa.
- *
- * Trả về null chứ không ném lỗi, để nơi gọi tự quyết: có chỗ cần báo lỗi cho
- * người dùng, có chỗ chỉ cần bỏ qua và dùng giá trị mặc định.
- */
-function docJson(raw: string): Record<string, any> | null {
-  const dau = raw.indexOf('{');
-  const cuoi = raw.lastIndexOf('}');
-  if (dau === -1 || cuoi <= dau) return null;
-  try {
-    return JSON.parse(raw.slice(dau, cuoi + 1));
-  } catch {
-    return null;
-  }
-}
-
 @Injectable()
 export class PostsService {
   constructor(
@@ -293,21 +269,10 @@ Thông tin hiện tại (có thể rỗng):
       { maxTokens: 6000, temperature: 0.3, profile: 'fast', timeoutMs: 10_000 },
     );
 
-    const parsed = docJson(rawText);
-    if (!parsed) {
-      // Ghi lại thứ AI thực sự trả về. Trước đây chỗ này nuốt mất nó, nên lỗi
-      // chỉ hiện ra là "dữ liệu không hợp lệ" mà không có cách nào biết vì sao.
-      // Ghi cả ĐỘ DÀI và ĐUÔI, không chỉ phần đầu: cắt log ở 500 ký tự thì
-      // không phân biệt được "AI trả về thiếu" với "log của mình cắt" — đúng
-      // cái bẫy đã mất một vòng deploy để nhận ra. Có đuôi là nhìn phát biết
-      // ngay JSON kết thúc đàng hoàng hay đứt giữa chừng.
-      console.warn(
-        `[optimizeSeo] không phân tích được JSON (dài ${rawText.length} ký tự)\n` +
-          `  đầu: ${rawText.slice(0, 300)}\n` +
-          `  đuôi: ${rawText.slice(-300)}`,
-      );
-      throw new Error('AI trả về dữ liệu không hợp lệ, thử lại');
-    }
+    // parseJsonFromAI (src/common/llm.ts) thay cho bản tự viết: nó thử thêm
+    // hai cách nữa — bóc code block nằm giữa chuỗi, và sửa xuống dòng lọt trong
+    // chuỗi JSON — rồi tự ghi log kèm độ dài và ném lỗi khi chịu thua.
+    const parsed = parseJsonFromAI<Record<string, any>>(rawText, 'optimizeSeo');
 
     return {
       seoTitle: parsed.seoTitle ?? '',
@@ -529,7 +494,7 @@ Nội dung: ${contentSnippet}`,
 
           let seo: { seoTitle?: string; seoDescription?: string; slug?: string; tags?: string[] } = {};
           try {
-            seo = docJson(seoRaw) ?? {};
+            seo = parseJsonFromAI(seoRaw, 'crawl-to-drafts/seo');
           } catch {
             seo = {};
           }

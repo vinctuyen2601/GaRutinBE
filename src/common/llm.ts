@@ -97,10 +97,16 @@ export function parseJsonFromAI<T = any>(text: string, context?: string): T {
   }
 
   // Không parse được — log để debug
+  // Ghi cả ĐỘ DÀI và ĐUÔI chứ không chỉ phần đầu. Chỉ xem phần đầu thì không
+  // phân biệt được "AI trả về thiếu" với "log bị cắt" — đã mất một vòng deploy
+  // vì đúng chỗ này. Có đuôi là nhìn phát biết ngay JSON kết thúc đàng hoàng
+  // hay đứt giữa chừng.
   console.error(
-    `[LLM] JSON parse failed${
-      context ? ` (${context})` : ''
-    }. Response preview:\n${text.slice(0, 400)}`,
+    `[LLM] JSON parse failed${context ? ` (${context})` : ''} — dài ${text.length} ký tự
+` +
+      `  đầu: ${text.slice(0, 300)}
+` +
+      `  đuôi: ${text.slice(-300)}`,
   );
   throw new Error('AI trả về dữ liệu không hợp lệ, vui lòng thử lại');
 }
