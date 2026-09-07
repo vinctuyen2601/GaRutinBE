@@ -209,10 +209,12 @@ const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'openrouter',
     url: 'https://openrouter.ai/api/v1/chat/completions',
-    // google/gemini-2.5-flash:free đã bị gỡ khỏi nhóm miễn phí (bản trả tiền vẫn
-    // còn). Đã đối chiếu danh sách model công khai của OpenRouter: gemma-4-31b-it
-    // là model miễn phí của Google còn phục vụ, ngữ cảnh 262k.
-    model: model('OPENROUTER_MODEL', 'google/gemma-4-31b-it:free'),
+    // Không ghim một model miễn phí cụ thể nữa. google/gemini-2.5-flash:free bị
+    // gỡ khỏi nhóm miễn phí và đó chính là thứ đã hạ gục provider này — ghim
+    // gemma-4-31b-it thay vào chỉ là dời ngày chết. openrouter/free là bộ định
+    // tuyến, tự chọn trong nhóm miễn phí còn phục vụ nên không chết theo một
+    // model lẻ. Bên 17Fishing đã dùng cách này và không dính đợt hỏng vừa rồi.
+    model: model('OPENROUTER_MODEL', 'openrouter/free'),
     envKey: 'OPENROUTER_API_KEY',
   },
 ];
