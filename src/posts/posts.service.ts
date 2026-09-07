@@ -10,6 +10,30 @@ import { SearchService } from './search.service';
 import { KeywordsService } from '../keywords/keywords.service';
 import { POST_TEMPLATES, getPostTemplate } from './post-templates';
 
+/**
+ * Tách JSON ra khỏi câu trả lời của AI.
+ *
+ * Không gọi thẳng JSON.parse được: dù prompt đã dặn "chỉ trả JSON thuần", mô
+ * hình vẫn hay gói thêm thứ khác quanh nó — rào ```json, một câu dẫn kiểu "Đây
+ * là kết quả:", hoặc phần suy luận của các mô hình reasoning như gpt-oss. Cách
+ * cũ chỉ bóc rào ở đúng đầu và cuối chuỗi nên gặp mấy trường hợp đó là hỏng.
+ *
+ * Cắt từ dấu { đầu tiên tới dấu } cuối cùng thì bỏ qua được hết phần thừa.
+ *
+ * Trả về null chứ không ném lỗi, để nơi gọi tự quyết: có chỗ cần báo lỗi cho
+ * người dùng, có chỗ chỉ cần bỏ qua và dùng giá trị mặc định.
+ */
+function docJson(raw: string): Record<string, any> | null {
+  const dau = raw.indexOf('{');
+  const cuoi = raw.lastIndexOf('}');
+  if (dau === -1 || cuoi <= dau) return null;
+  try {
+    return JSON.parse(raw.slice(dau, cuoi + 1));
+  } catch {
+    return null;
+  }
+}
+
 @Injectable()
 export class PostsService {
   constructor(
@@ -250,14 +274,20 @@ Thông tin hiện tại (có thể rỗng):
 
     const rawText = await callLLM(
       [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-      { maxTokens: 800, temperature: 0.3, profile: 'quality' },
+      // 800 token quá sát: riêng manualSuggestions và tags đã là mấy trăm token
+      // tiếng Việt, chạm trần là JSON bị cắt giữa chừng và phân tích hỏng.
+      // timeoutMs ngắn vì đây là việc nhẹ — không để một nhà cung cấp treo ăn
+      // hết 55 giây rồi CloudFront cắt trước khi nhà cung cấp sau kịp trả lời.
+      { maxTokens: 2000, temperature: 0.3, profile: 'quality', timeoutMs: 20_000 },
     );
 
-    let parsed: Record<string, any> = {};
-    try {
-      const json = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-      parsed = JSON.parse(json);
-    } catch {
+    const parsed = docJson(rawText);
+    if (!parsed) {
+      // Ghi lại thứ AI thực sự trả về. Trước đây chỗ này nuốt mất nó, nên lỗi
+      // chỉ hiện ra là "dữ liệu không hợp lệ" mà không có cách nào biết vì sao.
+      console.warn(
+        `[optimizeSeo] không phân tích được JSON, AI trả về: ${rawText.slice(0, 500)}`,
+      );
       throw new Error('AI trả về dữ liệu không hợp lệ, thử lại');
     }
 
@@ -479,7 +509,7 @@ Nội dung: ${contentSnippet}`,
 
           let seo: { seoTitle?: string; seoDescription?: string; slug?: string; tags?: string[] } = {};
           try {
-            seo = JSON.parse(seoRaw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''));
+            seo = docJson(seoRaw) ?? {};
           } catch {
             seo = {};
           }

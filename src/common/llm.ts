@@ -116,6 +116,17 @@ interface CallOptions {
   maxTokens?: number;
   temperature?: number;
   profile?: LLMProfile;
+  /**
+   * Thời gian chờ riêng cho lần gọi này, ghi đè TIMEOUT_MS.
+   *
+   * Cần thiết vì các việc khác nhau nặng rất khác nhau. Viết lại nguyên một bài
+   * mất 26–28 giây nên phải chờ lâu; còn xin vài dòng metadata SEO thì đáng lẽ
+   * chỉ vài giây. Dùng chung một mức chờ dài cho cả hai nghĩa là một nhà cung
+   * cấp treo sẽ ăn hết 55 giây của cả việc nhẹ — đã xảy ra thật: gemini treo
+   * 55s trong optimizeSeo, đủ để CloudFront cắt kết nối trước khi groq kịp
+   * trả lời thành công.
+   */
+  timeoutMs?: number;
 }
 
 interface ProviderDef {
@@ -287,13 +298,18 @@ export async function callLLM(
   messages: Message[],
   options: CallOptions = {},
 ): Promise<string> {
-  const { maxTokens = 1024, temperature = 0.7, profile = 'fast' } = options;
+  const {
+    maxTokens = 1024,
+    temperature = 0.7,
+    profile = 'fast',
+    timeoutMs = TIMEOUT_MS,
+  } = options;
   const attempts = buildAttempts(profile);
   const errors: string[] = [];
 
   for (const { def, key } of attempts) {
     const huy = new AbortController();
-    const dongHo = setTimeout(() => huy.abort(), TIMEOUT_MS);
+    const dongHo = setTimeout(() => huy.abort(), timeoutMs);
 
     try {
       const res = await fetch(def.url, {
@@ -339,7 +355,7 @@ export async function callLLM(
       // Ghi rõ ngưỡng để người đọc log biết ngay là chạm thời gian chờ.
       const quaHan = e?.name === 'AbortError' || e?.name === 'TimeoutError';
       const msg = `[LLM] ${def.name} ...${key.slice(-6)} failed: ${
-        quaHan ? `quá ${TIMEOUT_MS / 1000}s không phản hồi` : e.message
+        quaHan ? `quá ${timeoutMs / 1000}s không phản hồi` : e.message
       }`;
       console.warn(msg);
       errors.push(msg);
