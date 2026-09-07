@@ -274,19 +274,29 @@ Thông tin hiện tại (có thể rỗng):
 
     const rawText = await callLLM(
       [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-      // 800 token quá sát: riêng manualSuggestions và tags đã là mấy trăm token
-      // tiếng Việt, chạm trần là JSON bị cắt giữa chừng và phân tích hỏng.
+      // Trần token phải rộng hơn nhiều so với độ dài JSON mong đợi (~500 token).
+      // Lý do: gpt-oss-120b là mô hình reasoning và token suy luận bị TÍNH VÀO
+      // max_tokens, nên phần lớn hạn mức bị phần suy luận ăn mất và JSON hiện ra
+      // bị cắt giữa chừng. Đặt 800 rồi 2000 đều vẫn cắt; 6000 mới đủ chỗ.
+      // Trần rộng không làm chậm hay tốn thêm — mô hình vẫn dừng khi viết xong.
+      //
       // timeoutMs ngắn vì đây là việc nhẹ — không để một nhà cung cấp treo ăn
       // hết 55 giây rồi CloudFront cắt trước khi nhà cung cấp sau kịp trả lời.
-      { maxTokens: 2000, temperature: 0.3, profile: 'quality', timeoutMs: 20_000 },
+      { maxTokens: 6000, temperature: 0.3, profile: 'quality', timeoutMs: 20_000 },
     );
 
     const parsed = docJson(rawText);
     if (!parsed) {
       // Ghi lại thứ AI thực sự trả về. Trước đây chỗ này nuốt mất nó, nên lỗi
       // chỉ hiện ra là "dữ liệu không hợp lệ" mà không có cách nào biết vì sao.
+      // Ghi cả ĐỘ DÀI và ĐUÔI, không chỉ phần đầu: cắt log ở 500 ký tự thì
+      // không phân biệt được "AI trả về thiếu" với "log của mình cắt" — đúng
+      // cái bẫy đã mất một vòng deploy để nhận ra. Có đuôi là nhìn phát biết
+      // ngay JSON kết thúc đàng hoàng hay đứt giữa chừng.
       console.warn(
-        `[optimizeSeo] không phân tích được JSON, AI trả về: ${rawText.slice(0, 500)}`,
+        `[optimizeSeo] không phân tích được JSON (dài ${rawText.length} ký tự)\n` +
+          `  đầu: ${rawText.slice(0, 300)}\n` +
+          `  đuôi: ${rawText.slice(-300)}`,
       );
       throw new Error('AI trả về dữ liệu không hợp lệ, thử lại');
     }
@@ -504,7 +514,8 @@ Tiêu đề: ${rewriteTitle}
 Nội dung: ${contentSnippet}`,
               },
             ],
-            { maxTokens: 600, temperature: 0.3, profile: 'quality' },
+            // Cùng lý do như optimizeSeo: token suy luận ăn vào max_tokens.
+            { maxTokens: 6000, temperature: 0.3, profile: 'quality', timeoutMs: 20_000 },
           );
 
           let seo: { seoTitle?: string; seoDescription?: string; slug?: string; tags?: string[] } = {};
