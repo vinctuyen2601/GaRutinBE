@@ -178,6 +178,25 @@ function parseKeys(envValue: string | undefined): string[] {
  * Có biến môi trường thì lần sau chỉ cần đổi một dòng trong .env rồi
  * `pm2 restart garutin-be` — không cần sửa mã, không cần chờ deploy.
  */
+/**
+ * Thời gian chờ tối đa cho MỘT lần gọi tới một nhà cung cấp.
+ *
+ * Trước đây không có thời gian chờ nào cả. Một nhà cung cấp treo là treo luôn
+ * yêu cầu HTTP của người dùng, cho tới khi một tầng nào đó ở giữa bỏ cuộc và
+ * trả về 500 không kèm lý do — rất khó lần ra vì log ứng dụng không ghi gì.
+ *
+ * ĐÂY KHÔNG PHẢI cách sửa lỗi 500 khi viết lại bài dài. Lỗi đó do CloudFront
+ * cắt kết nối tới máy chủ ở 30 giây (mặc định) trong khi viết lại một bài dài
+ * mất 26–28 giây — phải nâng ngưỡng đó lên 60 giây ở console CloudFront thì
+ * mới hết. Thời gian chờ ở đây chỉ là lưới an toàn chống treo vô hạn.
+ *
+ * Vì vậy đặt mặc định 55 giây: cao hơn hẳn 26–28 giây của một lần chạy bình
+ * thường (đặt 25 giây là giết luôn cả những lần đang chạy được), và vẫn thấp
+ * hơn `proxy_read_timeout` mặc định 60 giây của nginx để lỗi bật ra từ ứng
+ * dụng — nơi có log nói rõ nhà cung cấp nào chậm — chứ không phải từ nginx.
+ */
+const TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS ?? 55_000);
+
 const model = (bien: string, macDinh: string) =>
   (process.env[bien] ?? '').trim() || macDinh;
 
@@ -273,9 +292,13 @@ export async function callLLM(
   const errors: string[] = [];
 
   for (const { def, key } of attempts) {
+    const huy = new AbortController();
+    const dongHo = setTimeout(() => huy.abort(), TIMEOUT_MS);
+
     try {
       const res = await fetch(def.url, {
         method: 'POST',
+        signal: huy.signal,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
@@ -312,9 +335,16 @@ export async function callLLM(
       }
       return text;
     } catch (e: any) {
-      const msg = `[LLM] ${def.name} ...${key.slice(-6)} failed: ${e.message}`;
+      // AbortError chỉ nói "This operation was aborted", không cho biết vì sao.
+      // Ghi rõ ngưỡng để người đọc log biết ngay là chạm thời gian chờ.
+      const quaHan = e?.name === 'AbortError' || e?.name === 'TimeoutError';
+      const msg = `[LLM] ${def.name} ...${key.slice(-6)} failed: ${
+        quaHan ? `quá ${TIMEOUT_MS / 1000}s không phản hồi` : e.message
+      }`;
       console.warn(msg);
       errors.push(msg);
+    } finally {
+      clearTimeout(dongHo);
     }
   }
 
