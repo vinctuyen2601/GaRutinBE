@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Header } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Header, BadRequestException } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
 import {
@@ -7,10 +7,14 @@ import {
   ImproveProductDescriptionDto,
 } from './dto/ai-product.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CategoriesService } from '../categories/categories.service';
 
 @Controller()
 export class ProductsController {
-  constructor(private service: ProductsService) {}
+  constructor(
+    private service: ProductsService,
+    private categories: CategoriesService,
+  ) {}
 
   @Get('products')
   findAll(
@@ -27,10 +31,44 @@ export class ProductsController {
     });
   }
 
+  /**
+   * Feed sản phẩm cho Google Merchant Center.
+   *
+   * `?danhMuc=<slug hoặc id>` chỉ gửi sản phẩm của một danh mục.
+   *
+   * Có tham số này vì chính sách Merchant Center có hạn chế quanh việc vận
+   * chuyển ĐỘNG VẬT SỐNG. Trại bán chủ yếu con giống, nên nếu Google từ chối
+   * phần đó thì vẫn gửi riêng được nhóm lồng và phụ kiện — thứ không vướng
+   * chính sách, mà lại là hàng giá cao nhất của trại.
+   *
+   * Slug sai thì trả 400 kèm lời giải thích, KHÔNG trả feed rỗng: người dán URL
+   * này vào Merchant Center sẽ thử trước trong trình duyệt, và một feed rỗng
+   * hợp lệ trông y như đang chạy đúng — họ chỉ phát hiện ra khi Google báo
+   * "0 sản phẩm" vài ngày sau.
+   *
+   * Danh mục có thật nhưng chưa có sản phẩm nào thì vẫn trả feed (rỗng) — đó là
+   * trạng thái hợp lệ, không phải nhập sai.
+   */
   @Get('feed/google')
   @Header('Content-Type', 'application/rss+xml; charset=utf-8')
-  async googleFeed(): Promise<string> {
-    const products = await this.service.findAll({ limit: 500 });
+  async googleFeed(@Query('danhMuc') danhMuc?: string): Promise<string> {
+    let categoryId: string | undefined;
+    if (danhMuc) {
+      const laUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(danhMuc);
+      if (laUuid) {
+        categoryId = danhMuc;
+      } else {
+        const dm = await this.categories.findBySlug(danhMuc);
+        if (!dm) {
+          throw new BadRequestException(
+            `Không có danh mục "${danhMuc}". Vào CMS → Danh mục để tạo, rồi gán sản phẩm vào danh mục đó.`,
+          );
+        }
+        categoryId = dm.id;
+      }
+    }
+
+    const products = await this.service.findAll({ limit: 500, categoryId });
     const siteUrl = process.env.WEB_URL || 'https://garutin.com';
 
     const esc = (s: string) =>
