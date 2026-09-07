@@ -167,29 +167,52 @@ function parseKeys(envValue: string | undefined): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Tên model đọc từ biến môi trường trước, mã nguồn chỉ là giá trị dự phòng.
+ *
+ * Đây là điểm mấu chốt: nhà cung cấp khai tử model liên tục, và mỗi lần như vậy
+ * TẤT CẢ provider cùng trả 404, tính năng viết bài chết hẳn cho tới khi có người
+ * sửa mã và triển khai lại. Ngày 07/09/2026 cả bốn cùng chết một lúc đúng vì
+ * bốn tên đều ghi cứng.
+ *
+ * Có biến môi trường thì lần sau chỉ cần đổi một dòng trong .env rồi
+ * `pm2 restart garutin-be` — không cần sửa mã, không cần chờ deploy.
+ */
+const model = (bien: string, macDinh: string) =>
+  (process.env[bien] ?? '').trim() || macDinh;
+
 const PROVIDER_DEFS: ProviderDef[] = [
   {
     name: 'groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    // llama-3.3-70b-versatile ngừng phục vụ 16/08/2026; Groq chỉ định thay bằng
+    // openai/gpt-oss-120b (hoặc qwen/qwen3.6-27b).
+    model: model('GROQ_MODEL', 'openai/gpt-oss-120b'),
     envKey: 'GROQ_API_KEY',
   },
   {
     name: 'gemini',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    model: 'gemini-2.5-flash',
+    // gemini-2.5-flash không còn mở cho tài khoản mới; chính thông báo lỗi của
+    // Google chỉ sang gemini-3.6-flash.
+    model: model('GEMINI_MODEL', 'gemini-3.6-flash'),
     envKey: 'GEMINI_API_KEY',
   },
   {
     name: 'cerebras',
     url: 'https://api.cerebras.ai/v1/chat/completions',
-    model: 'llama3.1-8b',
+    // llama3.1-8b không còn trên endpoint công khai; hiện chỉ còn gpt-oss-120b
+    // và qwen-3.8-27b được phục vụ rộng rãi.
+    model: model('CEREBRAS_MODEL', 'gpt-oss-120b'),
     envKey: 'CEREBRAS_API_KEY',
   },
   {
     name: 'openrouter',
     url: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'google/gemini-2.5-flash:free',
+    // google/gemini-2.5-flash:free đã bị gỡ khỏi nhóm miễn phí (bản trả tiền vẫn
+    // còn). Đã đối chiếu danh sách model công khai của OpenRouter: gemma-4-31b-it
+    // là model miễn phí của Google còn phục vụ, ngữ cảnh 262k.
+    model: model('OPENROUTER_MODEL', 'google/gemma-4-31b-it:free'),
     envKey: 'OPENROUTER_API_KEY',
   },
 ];
@@ -293,5 +316,14 @@ export async function callLLM(
     }
   }
 
-  throw new Error(`Tất cả AI providers thất bại:\n${errors.join('\n')}`);
+  // Bốn nhà cung cấp cùng trả 404 gần như luôn có một nguyên nhân: model bị khai
+  // tử. Nói thẳng ra cách sửa, thay vì để người đọc log tự suy từ bốn thông báo
+  // tiếng Anh khác nhau.
+  const deuLa404 = errors.length > 0 && errors.every((e) => e.includes('HTTP 404'));
+  const goiY = deuLa404
+    ? '\n\nTất cả đều 404 — nhiều khả năng tên model đã bị nhà cung cấp khai tử. ' +
+      'Đặt lại bằng biến môi trường GROQ_MODEL / GEMINI_MODEL / CEREBRAS_MODEL / ' +
+      'OPENROUTER_MODEL rồi khởi động lại, không cần sửa mã.'
+    : '';
+  throw new Error(`Tất cả AI providers thất bại:\n${errors.join('\n')}${goiY}`);
 }
