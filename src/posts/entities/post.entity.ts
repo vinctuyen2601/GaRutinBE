@@ -53,6 +53,15 @@ export class Post {
   @Column({ name: 'content_score', type: 'int', nullable: true })
   contentScore: number;
 
+  /**
+   * Id cấu trúc bài viết, khớp với `src/posts/post-templates.ts`.
+   *
+   * Chỉ là chuỗi, không phải khoá ngoại: danh sách khuôn nằm trong mã nguồn.
+   * Bài cũ có giá trị NULL vì trước đây trường này không được lưu.
+   */
+  @Column({ name: 'template_id', nullable: true })
+  templateId: string;
+
   @Column({ name: 'seo_details', type: 'jsonb', nullable: true })
   seoDetails: Record<string, any>;
 

@@ -42,6 +42,10 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   seoDescription?: string;
+
+  @IsString()
+  @IsOptional()
+  templateId?: string;
 }
 
 export class UpdatePostDto {
@@ -88,4 +92,8 @@ export class UpdatePostDto {
   @IsString()
   @IsOptional()
   seoDescription?: string;
+
+  @IsString()
+  @IsOptional()
+  templateId?: string;
 }
