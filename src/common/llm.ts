@@ -142,6 +142,7 @@ interface ProviderDef {
 const rateLimitCooldown = new Map<string, number>();
 const COOLDOWN_TPM_MS = 60_000; // 60s  — rate limit per minute (Groq TPM)
 const COOLDOWN_QUOTA_MS = 6 * 3600_000; // 6h   — daily quota exhausted (Gemini)
+const COOLDOWN_TIMEOUT_MS = 120_000; // 2m   — nhà cung cấp treo, không phản hồi
 
 function isRateLimited(key: string): boolean {
   const until = rateLimitCooldown.get(key);
@@ -151,6 +152,27 @@ function isRateLimited(key: string): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Cho một key tạm nghỉ sau khi nó chạm thời gian chờ.
+ *
+ * Không có cái này thì một nhà cung cấp đang treo sẽ ăn trọn hạn chờ của MỌI
+ * yêu cầu, mãi mãi. Đã xảy ra thật: gemini treo, mà profile 'quality' xếp
+ * gemini chạy trước, nên mỗi lần gọi đều mất 20 giây vô ích rồi mới tới groq —
+ * cộng lại vượt trần 30 giây của CloudFront và người dùng nhận 504, dù groq
+ * hoàn toàn khoẻ.
+ *
+ * Nghỉ ngắn (2 phút) chứ không dài như quota: nhà cung cấp treo thường là trục
+ * trặc nhất thời, nghỉ lâu thì tự tay bỏ mất một nhà cung cấp tốt.
+ */
+function markTimedOut(key: string): void {
+  rateLimitCooldown.set(key, Date.now() + COOLDOWN_TIMEOUT_MS);
+  console.warn(
+    `[LLM] Key ...${key.slice(-6)} tạm nghỉ ${
+      COOLDOWN_TIMEOUT_MS / 1000
+    }s vì không phản hồi`,
+  );
 }
 
 /** Phân biệt rate limit tạm thời vs quota ngày hết */
@@ -354,6 +376,7 @@ export async function callLLM(
       // AbortError chỉ nói "This operation was aborted", không cho biết vì sao.
       // Ghi rõ ngưỡng để người đọc log biết ngay là chạm thời gian chờ.
       const quaHan = e?.name === 'AbortError' || e?.name === 'TimeoutError';
+      if (quaHan) markTimedOut(key);
       const msg = `[LLM] ${def.name} ...${key.slice(-6)} failed: ${
         quaHan ? `quá ${timeoutMs / 1000}s không phản hồi` : e.message
       }`;
