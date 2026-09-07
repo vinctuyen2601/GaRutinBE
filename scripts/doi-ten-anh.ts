@@ -38,8 +38,27 @@ function slug(text: string): string {
       .replace(/đ/g, 'd')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
-      .slice(0, 60) || 'anh'
   );
+}
+
+/** Độ dài tối đa của phần tên, bằng mức media controller đang dùng. */
+const DAI_TOI_DA = 60;
+
+/**
+ * Cắt tên cho vừa độ dài, nhưng cắt ở RANH GIỚI TỪ.
+ *
+ * Cắt thẳng ở ký tự thứ 60 để lại những mẩu cụt vô nghĩa ngay trong tên tệp:
+ * "...thong-tin-can-biet-ve-chu-ky-a", "...bi-quyet-tu-trang-trai-ga-ru".
+ * Bỏ nốt từ bị cắt dở thì tên ngắn hơn vài ký tự mà đọc được trọn vẹn.
+ *
+ * Nếu ngay từ đầu tiên đã dài hơn giới hạn thì đành cắt thẳng — thà cụt còn hơn
+ * rỗng.
+ */
+function catTheoTu(s: string): string {
+  if (s.length <= DAI_TOI_DA) return s;
+  const cat = s.slice(0, DAI_TOI_DA);
+  const i = cat.lastIndexOf('-');
+  return (i > 0 ? cat.slice(0, i) : cat).replace(/-+$/, '');
 }
 
 /** Bỏ thẻ HTML để lấy tiêu đề sạch. */
@@ -148,7 +167,7 @@ async function main() {
     const khoa = khoaTuUrl(url);
     if (!khoa) return; // ảnh ngoài kho, không đụng tới
 
-    const goc = slug(ten);
+    const goc = catTheoTu(slug(ten)) || 'anh';
     const ext = duoi(khoa);
     const tenTep = khoa.split('/').pop() ?? '';
 
