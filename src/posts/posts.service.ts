@@ -280,9 +280,17 @@ Thông tin hiện tại (có thể rỗng):
       // bị cắt giữa chừng. Đặt 800 rồi 2000 đều vẫn cắt; 6000 mới đủ chỗ.
       // Trần rộng không làm chậm hay tốn thêm — mô hình vẫn dừng khi viết xong.
       //
-      // timeoutMs ngắn vì đây là việc nhẹ — không để một nhà cung cấp treo ăn
-      // hết 55 giây rồi CloudFront cắt trước khi nhà cung cấp sau kịp trả lời.
-      { maxTokens: 6000, temperature: 0.3, profile: 'quality', timeoutMs: 20_000 },
+      // profile 'fast' (groq trước) chứ không phải 'quality' (gemini trước).
+      //
+      // Đây chỉ là mấy dòng metadata, không phải bài viết — groq thừa sức. Mà
+      // trên thực tế 'quality' đang KHÔNG cho chất lượng cao hơn: gemini đang
+      // treo, nên mọi lần gọi đều mất trọn hạn chờ rồi rơi xuống groq và trả
+      // về đúng kết quả của groq. Xếp gemini trước chỉ tổ mất thêm thời gian.
+      //
+      // Thời gian là thứ quyết định ở đây: CloudFront cắt kết nối ở 30 giây,
+      // nên tổng thời gian phải nằm gọn dưới mốc đó. 10 giây mỗi lần thử nghĩa
+      // là kể cả nhà cung cấp đầu treo, nhà cung cấp sau vẫn kịp trả lời.
+      { maxTokens: 6000, temperature: 0.3, profile: 'fast', timeoutMs: 10_000 },
     );
 
     const parsed = docJson(rawText);
@@ -514,8 +522,9 @@ Tiêu đề: ${rewriteTitle}
 Nội dung: ${contentSnippet}`,
               },
             ],
-            // Cùng lý do như optimizeSeo: token suy luận ăn vào max_tokens.
-            { maxTokens: 6000, temperature: 0.3, profile: 'quality', timeoutMs: 20_000 },
+            // Cùng lý do như optimizeSeo: token suy luận ăn vào max_tokens,
+            // và groq trước cho kịp trần 30 giây của CloudFront.
+            { maxTokens: 6000, temperature: 0.3, profile: 'fast', timeoutMs: 10_000 },
           );
 
           let seo: { seoTitle?: string; seoDescription?: string; slug?: string; tags?: string[] } = {};
