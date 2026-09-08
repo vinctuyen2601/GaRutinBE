@@ -10,7 +10,18 @@ export class TrackingController {
 
   @Post('track')
   async track(
-    @Body() body: { platform?: string; path: string; event?: string; visitorId?: string },
+    @Body()
+    body: {
+      platform?: string;
+      path: string;
+      event?: string;
+      visitorId?: string;
+      referrer?: string;
+      utmSource?: string;
+      utmMedium?: string;
+      utmCampaign?: string;
+      utmContent?: string;
+    },
     @Req() req: Request,
   ) {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.ip;
@@ -24,6 +35,11 @@ export class TrackingController {
       visitorId: body.visitorId,
       // Nhận diện phía máy chủ chứ không tin phía gửi: bot không tự khai là bot.
       isBot: isBotUserAgent(userAgent),
+      referrer: body.referrer,
+      utmSource: body.utmSource,
+      utmMedium: body.utmMedium,
+      utmCampaign: body.utmCampaign,
+      utmContent: body.utmContent,
     });
     return { ok: true };
   }
@@ -32,6 +48,13 @@ export class TrackingController {
   @Get('admin/analytics/visits')
   getVisitStats(@Query('from') from?: string, @Query('to') to?: string) {
     return this.service.getVisitStats(from, to);
+  }
+
+  /** Bảng nguồn truy cập theo utm_source + utm_campaign, cho công cụ tạo link quảng cáo. */
+  @UseGuards(JwtAuthGuard)
+  @Get('admin/analytics/sources')
+  getSourceTable(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.service.getSourceTable({ from, to });
   }
 
   @UseGuards(JwtAuthGuard)

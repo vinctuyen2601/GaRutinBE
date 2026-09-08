@@ -7,6 +7,22 @@ import { Product } from '../products/entities/product.entity';
 
 const PLATFORMS: Platform[] = ['facebook', 'youtube', 'tiktok', 'zalo', 'web', 'other'];
 
+/**
+ * Lấy phần tên miền của referrer.
+ *
+ * Bọc try/catch vì giá trị này do trình duyệt khách gửi lên: một chuỗi không
+ * phải URL sẽ làm `new URL()` ném lỗi và hỏng cả lượt ghi nhận, chỉ vì một
+ * trường phụ dùng để làm báo cáo.
+ */
+function hostCua(url?: string): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').slice(0, 200);
+  } catch {
+    return null;
+  }
+}
+
 const dateStart = (d: string) => d + 'T00:00:00+07:00';
 const dateEnd   = (d: string) => d + 'T23:59:59+07:00';
 
@@ -29,6 +45,11 @@ export class TrackingService {
     event?: string;
     visitorId?: string;
     isBot?: boolean;
+    referrer?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    utmContent?: string;
   }): Promise<void> {
     const platform = (PLATFORMS.includes(dto.platform as Platform) ? dto.platform : 'other') as Platform;
     // Chỉ nhận đúng bốn bước của phễu. Giá trị lạ do khách tự gửi mà lọt vào
@@ -44,6 +65,72 @@ export class TrackingService {
       event,
       visitorId: dto.visitorId?.slice(0, 64) || null,
       isBot: dto.isBot ?? false,
+      referrer: dto.referrer?.slice(0, 2000) || null,
+      referrerHost: hostCua(dto.referrer),
+      // Cắt 200 ký tự: giá trị utm do người ngoài đặt trong URL nên không tin
+      // được độ dài, mà cột là varchar — chuỗi quá dài làm hỏng cả lượt ghi.
+      utmSource: dto.utmSource?.slice(0, 200) || null,
+      utmMedium: dto.utmMedium?.slice(0, 200) || null,
+      utmCampaign: dto.utmCampaign?.slice(0, 200) || null,
+      utmContent: dto.utmContent?.slice(0, 200) || null,
+    }));
+  }
+
+  /**
+   * Bảng nguồn truy cập: gom theo utm_source + utm_campaign, kèm số đơn.
+   *
+   * Đây là nửa còn lại của công cụ tạo link quảng cáo — tạo được link mà không
+   * xem được kết quả thì link chỉ để đó.
+   *
+   * Lượt truy cập KHÔNG có utm được gom thành hai nhóm rõ ràng thay vì bỏ đi:
+   * có referrer_host thì tính là nguồn giới thiệu (Google, Facebook tự nhiên),
+   * không có gì thì là truy cập trực tiếp. Bỏ chúng đi sẽ khiến tổng trong bảng
+   * không khớp với tổng lượt truy cập và người đọc sẽ nghi ngờ toàn bộ số liệu.
+   *
+   * Đơn hàng gom theo NGÀY chứ không truy ngược từng đơn về lượt xem: GaRutin
+   * chưa lưu nguồn vào đơn, nên cột đơn ở đây là tổng đơn trong cùng khoảng
+   * thời gian, dùng để đối chiếu xu hướng chứ không phải quy công cho từng
+   * nguồn. Ghi rõ ở đây để về sau không ai đọc nhầm thành doanh thu theo kênh.
+   */
+  async getSourceTable(opts: { from?: string; to?: string }): Promise<{
+    source: string;
+    campaign: string;
+    visits: number;
+    visitors: number;
+  }[]> {
+    const params: unknown[] = [];
+    // Cùng điều kiện "lượt xem thật" như các thống kê khác trong tệp này: bỏ
+    // bot, và chỉ tính bước 'view' — nếu tính cả add_to_cart/begin_checkout thì
+    // một người mua sẽ được đếm thành nhiều lượt và bảng nguồn bị thổi phồng.
+    const dieuKien = ["v.is_bot = false AND v.event = 'view'"];
+    if (opts.from) {
+      params.push(dateStart(opts.from));
+      dieuKien.push(`v.created_at >= $${params.length}`);
+    }
+    if (opts.to) {
+      params.push(dateEnd(opts.to));
+      dieuKien.push(`v.created_at <= $${params.length}`);
+    }
+
+    const rows = await this.visitRepo.query(
+      `SELECT COALESCE(NULLIF(v.utm_source, ''),
+                       NULLIF(v.referrer_host, ''),
+                       'trực tiếp')                       AS source,
+              COALESCE(NULLIF(v.utm_campaign, ''), '—')   AS campaign,
+              COUNT(*)                                    AS visits,
+              COUNT(DISTINCT COALESCE(v.visitor_id, v.ip)) AS visitors
+         FROM page_visits v
+        WHERE ${dieuKien.join(' AND ')}
+        GROUP BY 1, 2
+        ORDER BY visits DESC`,
+      params,
+    );
+
+    return rows.map((r: any) => ({
+      source: r.source,
+      campaign: r.campaign,
+      visits: Number(r.visits),
+      visitors: Number(r.visitors),
     }));
   }
 
