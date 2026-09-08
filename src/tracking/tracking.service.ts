@@ -95,6 +95,7 @@ export class TrackingService {
   async getSourceTable(opts: { from?: string; to?: string }): Promise<{
     source: string;
     campaign: string;
+    loai: string;
     visits: number;
     visitors: number;
   }[]> {
@@ -117,11 +118,27 @@ export class TrackingService {
                        NULLIF(v.referrer_host, ''),
                        'trực tiếp')                       AS source,
               COALESCE(NULLIF(v.utm_campaign, ''), '—')   AS campaign,
+              CASE
+                -- Có utm_medium trả tiền → quảng cáo. Xét medium trước source vì
+                -- cùng một nguồn "google" vừa có thể là quảng cáo vừa có thể là
+                -- SEO, và đó đúng là cặp dễ đọc nhầm nhất.
+                WHEN LOWER(COALESCE(v.utm_medium, '')) IN ('cpc','ppc','paid','paid_social')
+                  THEN 'quảng cáo'
+                -- Có utm nhưng không phải trả tiền: bài đăng, tin nhắn, email.
+                WHEN NULLIF(v.utm_source, '') IS NOT NULL
+                  THEN 'chiến dịch'
+                -- Không có utm mà đến từ máy tìm kiếm → SEO.
+                WHEN v.referrer_host ~ '^(www\.)?(google|bing|coccoc|duckduckgo|yandex)\.' 
+                  OR v.referrer_host IN ('search.yahoo.com','vn.search.yahoo.com')
+                  THEN 'tự nhiên (SEO)'
+                WHEN NULLIF(v.referrer_host, '') IS NOT NULL THEN 'giới thiệu'
+                ELSE 'trực tiếp'
+              END                                          AS loai,
               COUNT(*)                                    AS visits,
               COUNT(DISTINCT COALESCE(v.visitor_id, v.ip)) AS visitors
          FROM page_visits v
         WHERE ${dieuKien.join(' AND ')}
-        GROUP BY 1, 2
+        GROUP BY 1, 2, 3
         ORDER BY visits DESC`,
       params,
     );
@@ -129,6 +146,7 @@ export class TrackingService {
     return rows.map((r: any) => ({
       source: r.source,
       campaign: r.campaign,
+      loai: r.loai,
       visits: Number(r.visits),
       visitors: Number(r.visitors),
     }));
