@@ -8,7 +8,7 @@ import { callLLM, parseJsonFromAI } from '../common/llm';
 import { CrawlerService } from './crawler.service';
 import { SearchService } from './search.service';
 import { KeywordsService } from '../keywords/keywords.service';
-import { POST_TEMPLATES, getPostTemplate } from './post-templates';
+import { PostTemplatesService } from '../post-templates/post-templates.service';
 import { AiPromptsService } from '../ai-prompts/ai-prompts.service';
 
 @Injectable()
@@ -20,6 +20,7 @@ export class PostsService {
     private readonly searchService: SearchService,
     private readonly keywordsService: KeywordsService,
     private readonly aiPrompts: AiPromptsService,
+    private readonly postTemplates: PostTemplatesService,
   ) {}
 
   async findPublished(params: { category?: string; page?: number; limit?: number; q?: string } = {}): Promise<{ data: Post[]; total: number; page: number; limit: number }> {
@@ -216,7 +217,7 @@ Trả về JSON với cấu trúc:
       .trim()
       .slice(0, 3000);
 
-    const template = getPostTemplate(dto.templateId);
+    const template = await this.postTemplates.tra(dto.templateId);
     const templateNote = template
       ? `\n- Bài viết đang theo cấu trúc "${template.name}" (${template.description}) — manualSuggestions PHẢI phù hợp với cấu trúc này, KHÔNG đề xuất thêm FAQ nếu cấu trúc này không cần FAQ, không đề xuất CTA cứng nếu cấu trúc yêu cầu CTA lồng tự nhiên`
       : '';
@@ -315,12 +316,12 @@ Thông tin hiện tại (có thể rỗng):
       ? `Điểm chất lượng hiện tại: ${dto.contentScore}/100.\n`
       : '';
 
-    const template = getPostTemplate(dto.templateId);
+    const template = await this.postTemplates.tra(dto.templateId);
     // Lấy brief qua registry chứ không đọc thẳng template.brief: có vậy thì sửa
     // cấu trúc bài trong CMS mới thật sự đổi thứ gửi cho AI. Không có bản ghi
     // đè thì registry trả về đúng brief mặc định trong post-templates.ts.
     const structureRule = template
-      ? `4. ${await this.aiPrompts.lay(`post.template.${template.id}`)}`
+      ? `4. ${template.brief}`
       : `4. Nếu thiếu FAQ: thêm section cuối bài với ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn trả lời <p> ngắn
 5. Nếu thiếu CTA: thêm link tự nhiên <a href="/san-pham">xem sản phẩm</a> hoặc đề cập "Gà Rutin"
 6. Nếu thiếu internal link: thêm ít nhất 1 <a href="/blog/...">bài liên quan</a> phù hợp ngữ cảnh`;

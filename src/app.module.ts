@@ -10,6 +10,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { PostsModule } from './posts/posts.module';
 import { AiPromptsModule } from './ai-prompts/ai-prompts.module';
+import { PostTemplatesModule } from './post-templates/post-templates.module';
 import { OrdersModule } from './orders/orders.module';
 import { MediaModule } from './media/media.module';
 import { GalleryModule } from './gallery/gallery.module';
@@ -46,6 +47,7 @@ import { CustomersModule } from './customers/customers.module';
     CategoriesModule,
     ProductsModule,
     PostsModule,    AiPromptsModule,
+    PostTemplatesModule,
     OrdersModule,
     MediaModule,
     GalleryModule,

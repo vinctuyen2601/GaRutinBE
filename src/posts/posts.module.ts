@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PostTemplatesModule } from '../post-templates/post-templates.module';
 import { AiPromptsModule } from '../ai-prompts/ai-prompts.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Post } from './entities/post.entity';
@@ -9,7 +10,7 @@ import { SearchService } from './search.service';
 import { KeywordsModule } from '../keywords/keywords.module';
 
 @Module({
-  imports: [AiPromptsModule, TypeOrmModule.forFeature([Post]), KeywordsModule],
+  imports: [AiPromptsModule, PostTemplatesModule, TypeOrmModule.forFeature([Post]), KeywordsModule],
   providers: [PostsService, CrawlerService, SearchService],
   controllers: [PostsController],
   exports: [PostsService],

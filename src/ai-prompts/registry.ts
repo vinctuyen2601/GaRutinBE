@@ -21,7 +21,7 @@ export interface BienChoPhep {
 export interface KhaiBaoPrompt {
   key: string;
   /** Nhóm để CMS xếp danh sách — 19 prompt để phẳng thì không tìm nổi. */
-  nhom: 'Bài viết' | 'Cấu trúc bài viết' | 'Sản phẩm';
+  nhom: 'Bài viết' | 'Sản phẩm';
   nhan: string;
   moTa: string;
   /** Biến được thay lúc chạy, viết dạng {{ten}} trong nội dung prompt. */
@@ -186,128 +186,6 @@ Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown cod
     macDinh: `Bạn là chuyên gia viết mô tả sản phẩm cho trang trại Gà Rutin.
 Cải thiện mô tả sản phẩm: thêm thông tin hữu ích, cải thiện cấu trúc, tăng tính thuyết phục.
 Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
-  },
-  {
-    key: 'post.template.how-to',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Hướng dẫn từng bước',
-    moTa: 'Cách nuôi/chăm sóc — mở bài nêu vấn đề, các bước rõ ràng, có FAQ cuối bài — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng HƯỚNG DẪN TỪNG BƯỚC:
-- Mở bài: nêu vấn đề/khó khăn người mới hay gặp liên quan chủ đề
-- Thân bài: Chuẩn bị (dụng cụ/điều kiện cần) → Các bước thực hiện theo thứ tự (dùng <h3> hoặc <ol> đánh số rõ ràng) → Lỗi thường gặp và cách tránh → Kinh nghiệm thực tế
-- Cuối bài: thêm 2-3 câu hỏi FAQ dạng <h3> kết thúc bằng "?" + trả lời ngắn
-- CTA: 1 link tự nhiên <a href="/san-pham">xem sản phẩm</a> ở cuối bài`,
-  },
-  {
-    key: 'post.template.listicle',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Danh sách Top N',
-    moTa: 'Liệt kê Top N mẹo/giống/sai lầm — không có FAQ, CTA lồng giữa bài — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng LISTICLE (danh sách Top N):
-- Mở bài: preview ngắn gọn những gì danh sách sắp liệt kê, nêu rõ số lượng (vd "Top 7...")
-- Thân bài: đánh số từng mục bằng <h3>, mỗi mục 2-4 câu mô tả súc tích, không lan man
-- KHÔNG thêm phần FAQ ở cuối bài — dạng listicle không cần
-- CTA: lồng 1 link tự nhiên <a href="/san-pham">...</a> vào ĐÚNG 1 mục có liên quan sản phẩm, không đặt ở cuối bài`,
-  },
-  {
-    key: 'post.template.comparison',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'So sánh',
-    moTa: 'So sánh 2 lựa chọn — có bảng so sánh, FAQ ngắn theo tình huống — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng SO SÁNH:
-- Mở bài: nêu rõ 2 lựa chọn/phương án cần so sánh và vì sao người đọc phân vân
-- Thân bài: dùng <table> so sánh theo từng tiêu chí (2-3 hàng), sau đó phân tích chi tiết từng tiêu chí bằng <h3>
-- Kết bài: đưa ra khuyến nghị "nên chọn gì tùy trường hợp nào"
-- FAQ: đúng 2 câu hỏi <h3> về tình huống cụ thể + trả lời ngắn
-- CTA: nhẹ nhàng, lồng trong câu kết luận, KHÔNG dùng link cứng`,
-  },
-  {
-    key: 'post.template.definition',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Định nghĩa/Giải thích khái niệm',
-    moTa: '"X là gì" — trả lời ngay đầu bài kiểu featured snippet, nhiều FAQ — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng ĐỊNH NGHĨA/GIẢI THÍCH KHÁI NIỆM:
-- Mở bài: trả lời THẲNG câu hỏi "là gì" trong 1-2 câu đầu tiên (kiểu trả lời cho featured snippet Google)
-- Thân bài: Đặc điểm nổi bật → Nguồn gốc/xuất xứ → Phân loại (nếu có) → Có nên nuôi/dùng không
-- Cuối bài: FAQ 3-4 câu <h3> liên quan trực tiếp đến khái niệm
-- CTA: 1 câu nhẹ nhàng cuối bài`,
-  },
-  {
-    key: 'post.template.case-study',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Câu chuyện/trải nghiệm thực tế',
-    moTa: 'Kể chuyện kinh nghiệm nuôi thực tế — KHÔNG FAQ, không CTA link cứng — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng CÂU CHUYỆN/TRẢI NGHIỆM THỰC TẾ (case study):
-- Mở bài: kể lại 1 tình huống cụ thể (thời gian, hoàn cảnh) như đang chia sẻ trải nghiệm cá nhân
-- Thân bài: Bối cảnh/vấn đề gặp phải → Cách giải quyết từng bước → Kết quả đạt được → Bài học rút ra
-- Giọng văn: kể chuyện tự nhiên, KHÔNG dùng giọng "hướng dẫn" khô khan
-- KHÔNG thêm phần FAQ — sẽ phá vỡ mạch kể chuyện
-- KHÔNG chèn link CTA dạng cứng cuối bài — nếu nhắc đến sản phẩm thì lồng tự nhiên vào mạch chuyện, không bắt buộc`,
-  },
-  {
-    key: 'post.template.checklist',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Checklist chuẩn bị',
-    moTa: 'Danh sách kiểm tra trước khi làm gì đó — CTA lồng giữa checklist — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng CHECKLIST:
-- Mở bài: 1-2 câu nêu mục đích của checklist này
-- Thân bài: nhóm các mục cần chuẩn bị thành từng nhóm rõ ràng bằng <h3>, mỗi nhóm là 1 <ul> danh sách các mục cần check
-- CTA: lồng 1 link tự nhiên <a href="/san-pham">...</a> ngay trong 1 mục checklist liên quan (vd mục "thức ăn", "dụng cụ")
-- FAQ: 1-2 câu ngắn cuối bài, không cần nhiều`,
-  },
-  {
-    key: 'post.template.pros-cons',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Ưu-nhược điểm',
-    moTa: '"Có nên..." đánh giá khách quan 2 chiều, FAQ phản biện nhược điểm — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng ƯU-NHƯỢC ĐIỂM:
-- Mở bài: đặt câu hỏi nghi vấn thẳng (vd "Có nên...?")
-- Thân bài: mục "Ưu điểm" (<h3> + <ul>) → mục "Nhược điểm" (<h3> + <ul>) → mục "Phù hợp với ai"
-- FAQ: 2 câu <h3> phản biện lại các nhược điểm đã nêu, giải thích cách khắc phục
-- CTA: cuối bài, giọng mời tư vấn/tìm hiểu thêm, KHÔNG dùng "xem sản phẩm" khô khan`,
-  },
-  {
-    key: 'post.template.problem-solution',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Vấn đề-Giải pháp',
-    moTa: 'Khắc phục sự cố/bệnh — nguyên nhân, xử lý ngay, phòng ngừa — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng VẤN ĐỀ-GIẢI PHÁP:
-- Mở bài: mô tả cụ thể triệu chứng/vấn đề đang gặp phải
-- Thân bài: Nguyên nhân (<h3>) → Cách xử lý ngay (<h3>, các bước cụ thể) → Cách phòng ngừa lâu dài (<h3>)
-- FAQ: 3 câu <h3> về các biến chứng/trường hợp đặc biệt
-- CTA: cuối bài, nhẹ nhàng`,
-  },
-  {
-    key: 'post.template.seasonal',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Theo mùa vụ/thời điểm',
-    moTa: 'Lưu ý theo mùa/tháng tại Việt Nam — chia theo giai đoạn thời gian — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng THEO MÙA VỤ/THỜI ĐIỂM:
-- Mở bài: liên hệ đến thời điểm/mùa vụ hiện tại ở Việt Nam liên quan chủ đề
-- Thân bài: chia theo từng giai đoạn/mốc thời gian cụ thể (<h3> theo tháng/mùa), mỗi giai đoạn nêu lưu ý riêng
-- Kết bài: tổng kết những điều cần nhớ theo mùa
-- FAQ: 2 câu <h3>
-- CTA: giữa bài hoặc cuối bài, tùy ngữ cảnh`,
-  },
-  {
-    key: 'post.template.qa-first',
-    nhom: 'Cấu trúc bài viết',
-    nhan: 'Hỏi-đáp toàn bài',
-    moTa: 'Gộp nhiều câu hỏi hay gặp thành nội dung chính, không phải phụ lục — nội dung này THAY THẾ ba quy tắc mặc định về FAQ, CTA và internal link khi bài chọn khuôn này.',
-    bien: [],
-    macDinh: `Viết theo dạng HỎI-ĐÁP TOÀN BÀI (Q&A-first):
-- Mở bài: giới thiệu ngắn gọn sẽ trả lời N câu hỏi phổ biến nhất về chủ đề này
-- Thân bài: TOÀN BỘ nội dung chính là chuỗi câu hỏi <h2> kết thúc bằng "?" + đoạn trả lời <p> chi tiết ngay sau — đây KHÔNG phải phần FAQ phụ lục mà LÀ nội dung chính của bài, cần 5-7 câu hỏi
-- CTA: rải rác tự nhiên ở 1-2 câu trả lời có liên quan sản phẩm, không gượng ép`,
   },
 ];
 
