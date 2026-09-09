@@ -46,6 +46,10 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   templateId?: string;
+
+  @IsString()
+  @IsOptional()
+  redirectTo?: string;
 }
 
 export class UpdatePostDto {
@@ -96,4 +100,8 @@ export class UpdatePostDto {
   @IsString()
   @IsOptional()
   templateId?: string;
+
+  @IsString()
+  @IsOptional()
+  redirectTo?: string;
 }

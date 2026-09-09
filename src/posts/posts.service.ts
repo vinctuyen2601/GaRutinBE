@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
@@ -25,7 +25,7 @@ export class PostsService {
 
   async findPublished(params: { category?: string; page?: number; limit?: number; q?: string } = {}): Promise<{ data: Post[]; total: number; page: number; limit: number }> {
     const qb = this.repo.createQueryBuilder('p')
-      .where(`p.status = 'published' AND p.deleted_at IS NULL`)
+      .where(`p.status = 'published' AND p.deleted_at IS NULL AND p.redirect_to IS NULL`)
       .orderBy('p.published_at', 'DESC')
       .addOrderBy('p.created_at', 'DESC');
 
@@ -40,6 +40,14 @@ export class PostsService {
     return { data, total, page, limit };
   }
 
+  /**
+   * Bài công khai, ĐÃ LOẠI bài chuyển hướng.
+   *
+   * Bài chuyển hướng không còn nội dung riêng nên không được xuất hiện ở danh
+   * sách blog, khối "Đọc thêm", hay sitemap — để lại thì người đọc bấm vào rồi
+   * bị đẩy đi nơi khác, còn Google thì tốn công thu thập một trang chỉ để nhận
+   * lệnh 301.
+   */
   findAllAdmin(): Promise<Post[]> {
     return this.repo.find({ order: { createdAt: 'DESC' } });
   }
@@ -60,9 +68,52 @@ export class PostsService {
     return this.repo.save(post);
   }
 
+  /**
+   * Kiểm một chuyển hướng có hợp lệ không.
+   *
+   * Ba thứ phải chặn, và chặn ở MÁY CHỦ chứ không chỉ ở giao diện:
+   *
+   * 1. Tự trỏ về mình — trình duyệt lặp vô hạn rồi báo lỗi, trang chết hẳn.
+   * 2. Bài đích không tồn tại — người dùng bị dẫn tới 404, tệ hơn cả để nguyên.
+   * 3. Bài đích lại chuyển hướng đi nơi khác — tạo chuỗi A→B→C. Google chỉ đi
+   *    theo vài bước rồi bỏ, và mỗi bước làm loãng thêm tín hiệu. Bắt trỏ thẳng
+   *    tới đích cuối.
+   */
+  private async kiemChuyenHuong(post: Post, dich: string): Promise<void> {
+    const slugDich = dich.trim();
+    if (!slugDich) return;
+
+    if (slugDich === post.slug) {
+      throw new BadRequestException('Bài không thể chuyển hướng về chính nó');
+    }
+
+    const baiDich = await this.repo.findOne({ where: { slug: slugDich } });
+    if (!baiDich) {
+      throw new BadRequestException(`Không có bài nào với slug "${slugDich}"`);
+    }
+    if (baiDich.redirectTo) {
+      throw new BadRequestException(
+        `Bài đích "${baiDich.title}" cũng đang chuyển hướng sang "${baiDich.redirectTo}". ` +
+          'Hãy trỏ thẳng tới bài cuối cùng — chuỗi chuyển hướng làm loãng tín hiệu và Google chỉ đi theo vài bước.',
+      );
+    }
+
+    // Bài này đang là đích của bài khác? Đặt chuyển hướng cho nó sẽ biến những
+    // bài kia thành chuỗi mà người đặt không hề biết.
+    const dangLaDich = await this.repo.count({ where: { redirectTo: post.slug } });
+    if (dangLaDich > 0) {
+      throw new BadRequestException(
+        `Đang có ${dangLaDich} bài chuyển hướng VỀ bài này. Chuyển hướng nó đi nơi khác sẽ tạo chuỗi — hãy trỏ các bài đó sang "${slugDich}" trước.`,
+      );
+    }
+  }
+
   async update(id: string, dto: UpdatePostDto): Promise<Post> {
     const post = await this.findById(id);
     if (!post) throw new NotFoundException('Bài viết không tồn tại');
+    if (dto.redirectTo !== undefined && dto.redirectTo !== null && dto.redirectTo !== '') {
+      await this.kiemChuyenHuong(post, dto.redirectTo);
+    }
     if (dto.status === 'published' && post.status !== 'published' && !dto.publishedAt) {
       dto.publishedAt = new Date().toISOString();
     }

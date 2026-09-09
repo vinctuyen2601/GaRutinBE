@@ -59,6 +59,15 @@ export class Post {
    * Chỉ là chuỗi, không phải khoá ngoại: danh sách khuôn nằm trong mã nguồn.
    * Bài cũ có giá trị NULL vì trước đây trường này không được lưu.
    */
+  /**
+   * Slug của bài mà bài này chuyển hướng tới (301). Null nghĩa là bài bình thường.
+   *
+   * Bài có giá trị này KHÔNG còn hiện nội dung của mình nữa — nó chỉ còn nhiệm
+   * vụ dẫn người và Google sang bài đích.
+   */
+  @Column({ name: 'redirect_to', nullable: true })
+  redirectTo: string | null;
+
   @Column({ name: 'template_id', nullable: true })
   templateId: string;
 
