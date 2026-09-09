@@ -68,7 +68,14 @@ function fixJsonStringNewlines(raw: string): string {
  * - Có text giải thích trước/sau JSON
  * - JSON string values chứa newline thực sự (HTML nhiều dòng)
  */
-export function parseJsonFromAI<T = any>(text: string, context?: string): T {
+/**
+ * Thử đọc JSON từ câu trả lời, KHÔNG log và KHÔNG ném lỗi.
+ *
+ * Tách ra để vòng dự phòng trong callLLM dùng được: ở đó "không đọc được" là
+ * chuyện bình thường, chỉ có nghĩa là phải hỏi nhà cung cấp kế tiếp — không
+ * phải sự cố đáng ghi vào log lỗi.
+ */
+function thuDocJson(text: string): { duoc: true; giaTri: unknown } | undefined {
   const candidates: string[] = [];
 
   // 1. Text gốc
@@ -86,15 +93,19 @@ export function parseJsonFromAI<T = any>(text: string, context?: string): T {
   }
 
   for (const candidate of candidates) {
-    // Thử parse thẳng
     try {
-      return JSON.parse(candidate);
+      return { duoc: true, giaTri: JSON.parse(candidate) };
     } catch {}
-    // Thử sau khi fix newlines bên trong strings
     try {
-      return JSON.parse(fixJsonStringNewlines(candidate));
+      return { duoc: true, giaTri: JSON.parse(fixJsonStringNewlines(candidate)) };
     } catch {}
   }
+  return undefined;
+}
+
+export function parseJsonFromAI<T = any>(text: string, context?: string): T {
+  const doc = thuDocJson(text);
+  if (doc) return doc.giaTri as T;
 
   // Không parse được — log để debug
   // Ghi cả ĐỘ DÀI và ĐUÔI chứ không chỉ phần đầu. Chỉ xem phần đầu thì không
@@ -391,6 +402,25 @@ export async function callLLM(
       const data = (await res.json()) as any;
       const text: string = data.choices?.[0]?.message?.content?.trim() ?? '';
       if (!text) throw new Error('Empty response');
+
+      // Kiểm JSON NGAY TẠI ĐÂY, không để tới nơi gọi.
+      //
+      // Trước đây callLLM trả về văn bản đầu tiên khác rỗng, còn việc đọc JSON
+      // nằm ở nơi gọi — nên một nhà cung cấp phớt lờ response_format và trả về
+      // văn xuôi là hỏng cả lệnh, ba nhà còn lại không bao giờ được thử. Đã
+      // xảy ra thật: cùng một lệnh tối ưu SEO, lúc chạy được lúc trả 500, tuỳ
+      // hôm đó nhà nào còn hạn mức.
+      //
+      // Đòi phải là OBJECT chứ không chỉ "JSON hợp lệ": một chuỗi trần cũng là
+      // JSON hợp lệ nhưng không có khoá nào để dùng.
+      if (jsonMode) {
+        const doc = thuDocJson(text);
+        if (!doc || typeof doc.giaTri !== 'object' || doc.giaTri === null) {
+          throw new Error(
+            `không trả về JSON (${text.length} ký tự: ${text.slice(0, 80).replace(/\s+/g, ' ')}…)`,
+          );
+        }
+      }
 
       if (errors.length > 0) {
         console.log(
