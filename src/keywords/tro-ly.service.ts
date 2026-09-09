@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Keyword } from './entities/keyword.entity';
 import { KeywordSuggestion } from './entities/keyword-suggestion.entity';
 import { Post } from '../posts/entities/post.entity';
@@ -64,7 +64,14 @@ export class TroLyService {
   async bangPhanTich(): Promise<DongPhanTich[]> {
     const [kws, posts, doc] = await Promise.all([
       this.kwRepo.find(),
-      this.postRepo.find({ select: ['id', 'slug', 'title'] }),
+      this.postRepo.find({
+        select: ['id', 'slug', 'title'],
+        // Bỏ bài đã gộp sang bài khác. Không lọc thì gộp xong bảng vẫn đếm
+        // chúng và vẫn báo "gộp bài" — việc đã làm xong mà nút vẫn còn đó,
+        // người dùng bấm lại rồi tưởng hỏng. Bài chuyển hướng cũng không còn
+        // nội dung riêng nên không thể "nhắm" vào từ khoá nào nữa.
+        where: { redirectTo: IsNull() },
+      }),
       this.nguoiDocTheoSlug(),
     ]);
 
@@ -150,7 +157,14 @@ export class TroLyService {
     ]);
 
     const [posts, doc, kws, daGoiY] = await Promise.all([
-      this.postRepo.find({ select: ['id', 'slug', 'title'] }),
+      this.postRepo.find({
+        select: ['id', 'slug', 'title'],
+        // Bỏ bài đã gộp sang bài khác. Không lọc thì gộp xong bảng vẫn đếm
+        // chúng và vẫn báo "gộp bài" — việc đã làm xong mà nút vẫn còn đó,
+        // người dùng bấm lại rồi tưởng hỏng. Bài chuyển hướng cũng không còn
+        // nội dung riêng nên không thể "nhắm" vào từ khoá nào nữa.
+        where: { redirectTo: IsNull() },
+      }),
       this.nguoiDocTheoSlug(),
       this.kwRepo.find({ select: ['keyword'] }),
       this.ggRepo.find({ select: ['keyword'] }),
