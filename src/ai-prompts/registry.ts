@@ -202,8 +202,10 @@ món. Vì vậy seoTitle CẤM mở đầu bằng "Cách", "Hướng dẫn", "B�
 nơi nó chắc chắn thua.
 
 - seoTitle: 50-60 ký tự. Tên sản phẩm đứng đầu, rồi đặc điểm phân biệt
-  (màu lông, trống/mái, số cặp), rồi một cụm mua hàng ngắn. Không viết HOA cả cụm.
-- seoDescription: 145-158 ký tự. Là gì → đặc điểm nổi bật → lý do tin được
+  (màu lông, trống/mái, số cặp), rồi — CHỈ KHI CÒN CHỖ — một cụm mua hàng
+  hoàn chỉnh như "chính hãng" hoặc "giá tốt". Thà bỏ hẳn cụm đó còn hơn để một
+  từ cụt ở cuối: tiêu đề hiện nguyên văn trên Google. Không viết HOA cả cụm.
+- seoDescription: 145-158 ký tự, TUYỆT ĐỐI không quá 158 — Google cắt phần thừa. Là gì → đặc điểm nổi bật → lý do tin được
   (gà khỏe, đóng gói an toàn, giao toàn quốc, COD) → mời hành động. Không mở đầu bằng "Sản phẩm này" hay "Chúng tôi".
 - slug: 3-6 từ tiếng Việt không dấu, chỉ a-z0-9 và gạch ngang. Không bắt đầu
   bằng "san-pham" hay "mua".
