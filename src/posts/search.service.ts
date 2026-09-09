@@ -82,6 +82,42 @@ export class SearchService {
     return collected;
   }
 
+  /**
+   * Lấy gợi ý từ khoá từ Google.
+   *
+   * Cùng một lời gọi Serper mà chức năng cào bài đang dùng, nhưng đọc hai
+   * trường trước đây bị vứt đi: `peopleAlsoAsk` và `relatedSearches`. Chúng
+   * nằm sẵn trong phản hồi và đã được trả tiền — mỗi câu trong peopleAlsoAsk
+   * là một câu hỏi THẬT người dùng gõ, tức một tiêu đề bài viết có sẵn nhu cầu.
+   */
+  async layGoiYTuKhoa(keyword: string): Promise<{ cauHoi: string[]; lienQuan: string[] }> {
+    const apiKey = process.env.SERPER_API_KEY;
+    if (!apiKey) {
+      this.logger.warn('SERPER_API_KEY chưa được cấu hình');
+      return { cauHoi: [], lienQuan: [] };
+    }
+    try {
+      const res = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: keyword, hl: 'vi', gl: 'vn', num: 10 }),
+      });
+      if (!res.ok) {
+        this.logger.warn(`Serper gợi ý lỗi: ${res.status}`);
+        return { cauHoi: [], lienQuan: [] };
+      }
+      const data: any = await res.json();
+      return {
+        cauHoi: (data.peopleAlsoAsk || []).map((x: any) => x.question).filter(Boolean),
+        lienQuan: (data.relatedSearches || []).map((x: any) => x.query).filter(Boolean),
+      };
+    } catch (e: any) {
+      // Gợi ý hỏng không được làm chết cả trang — trả rỗng và ghi log.
+      this.logger.error(`Serper gợi ý thất bại: ${e.message}`);
+      return { cauHoi: [], lienQuan: [] };
+    }
+  }
+
   private async fetchSerper(
     apiKey: string,
     keyword: string,

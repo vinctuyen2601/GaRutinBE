@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { TroLyService } from './tro-ly.service';
 import { KeywordsService } from './keywords.service';
 import { CreateKeywordDto, UpdateKeywordDto } from './dto/keyword.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -6,7 +7,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('admin/keywords')
 @UseGuards(JwtAuthGuard)
 export class KeywordsController {
-  constructor(private readonly service: KeywordsService) {}
+  constructor(private readonly service: KeywordsService,
+    private readonly troLy: TroLyService,) {}
 
   @Get()
   findAll() {
@@ -41,5 +43,41 @@ export class KeywordsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  /* ── Trợ lý thống kê ───────────────────────────────────────────────────── */
+
+  /** Bảng chính: mỗi từ khoá kèm việc nên làm, xếp theo mức đáng làm. */
+  @Get('phan-tich')
+  bangPhanTich() {
+    return this.troLy.bangPhanTich();
+  }
+
+  /** Nhận số liệu xuất từ Search Console; từ khoá lạ sẽ được tạo mới. */
+  @Post('nhap-search-console')
+  nhapSearchConsole(
+    @Body() body: { rows: { keyword: string; impressions: number; clicks: number; position?: number }[] },
+  ) {
+    return this.troLy.nhapSearchConsole(body?.rows ?? []);
+  }
+
+  @Get('goi-y')
+  danhSachGoiY() {
+    return this.troLy.danhSachGoiY();
+  }
+
+  @Post('goi-y/tim')
+  timGoiY(@Body() body: { keyword: string }) {
+    return this.troLy.layGoiY(body?.keyword ?? '');
+  }
+
+  @Post('goi-y/:id/nhan')
+  nhanGoiY(@Param('id') id: string) {
+    return this.troLy.nhanGoiY(id);
+  }
+
+  @Post('goi-y/:id/bo-qua')
+  boQuaGoiY(@Param('id') id: string) {
+    return this.troLy.boQuaGoiY(id);
   }
 }
