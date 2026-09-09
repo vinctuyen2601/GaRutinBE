@@ -131,10 +131,7 @@ export class PostsService {
       [
         {
           role: 'system',
-          content: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (garutin.com) chuyên về gà rutin (chim cút Nhật Bản).
-Nhiệm vụ: đọc nội dung từ URL được cung cấp, viết lại thành bài viết mới hoàn toàn phù hợp với chủ đề gà rutin.
-Không copy nguyên văn — phải viết lại theo góc nhìn của trang trại Gà Rutin, thêm thông tin thực tế về gà rutin.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+          content: await this.aiPrompts.lay('post.generate-from-url'),
         },
         {
           role: 'user',
@@ -180,9 +177,7 @@ Trả về JSON:
       [
         {
           role: 'system',
-          content: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (chim cút Nhật Bản).
-Viết bài blog chuyên sâu, hữu ích về nuôi gà rutin, trứng cút, sức khỏe gia cầm, kỹ thuật chăn nuôi.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+          content: await this.aiPrompts.lay('post.generate'),
         },
         {
           role: 'user',
@@ -321,8 +316,11 @@ Thông tin hiện tại (có thể rỗng):
       : '';
 
     const template = getPostTemplate(dto.templateId);
+    // Lấy brief qua registry chứ không đọc thẳng template.brief: có vậy thì sửa
+    // cấu trúc bài trong CMS mới thật sự đổi thứ gửi cho AI. Không có bản ghi
+    // đè thì registry trả về đúng brief mặc định trong post-templates.ts.
     const structureRule = template
-      ? `4. ${template.brief}`
+      ? `4. ${await this.aiPrompts.lay(`post.template.${template.id}`)}`
       : `4. Nếu thiếu FAQ: thêm section cuối bài với ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn trả lời <p> ngắn
 5. Nếu thiếu CTA: thêm link tự nhiên <a href="/san-pham">xem sản phẩm</a> hoặc đề cập "Gà Rutin"
 6. Nếu thiếu internal link: thêm ít nhất 1 <a href="/blog/...">bài liên quan</a> phù hợp ngữ cảnh`;
@@ -462,20 +460,7 @@ ${cleanContent}`;
             [
               {
                 role: 'system',
-                content: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (garutin.com) chuyên về gà rutin (chim cút Nhật Bản).
-Nhiệm vụ: đọc nội dung từ nguồn, viết thành bài viết hoàn chỉnh bằng tiếng Việt theo góc nhìn trang trại Gà Rutin.
-YÊU CẦU BẮT BUỘC:
-- Không copy nguyên văn, thêm thông tin thực tế Việt Nam (giá VND, kinh nghiệm nuôi)
-- Tối thiểu 700 từ, dùng <h2>, <h3>, <p>, <ul>, <li>, <strong>
-- Thêm section FAQ cuối bài: ít nhất 3 thẻ <h3> kết thúc bằng "?" + đoạn <p> trả lời ngắn
-- Thêm 1 link CTA tự nhiên: <a href="/san-pham">xem sản phẩm</a>
-
-FORMAT OUTPUT BẮT BUỘC (3 dòng delimiter, không thêm gì khác):
-TITLE: [tiêu đề mới hấp dẫn, có keyword]
-===EXCERPT===
-[tóm tắt 1-2 câu hấp dẫn]
-===HTML===
-[toàn bộ HTML nội dung bài viết]`,
+                content: await this.aiPrompts.lay('post.crawl-rewrite'),
               },
               {
                 role: 'user',
@@ -510,13 +495,7 @@ Nội dung gốc:
             [
               {
                 role: 'system',
-                content: `Bạn là chuyên gia SEO cho garutin.com — website trang trại Gà Rutin.
-Quy tắc NGHIÊM NGẶT:
-- seoTitle: 50-60 ký tự — keyword PHẢI xuất hiện ở đầu, dùng power words
-- seoDescription: 145-158 ký tự — Hook + Giải pháp + CTA. KHÔNG bắt đầu bằng "Bài viết"
-- slug: 3-6 từ tiếng Việt không dấu, chỉ a-z0-9 và dấu gạch ngang
-- tags: 5-7 tags — 2 broad (1-2 từ) + 3-4 long-tail (3-5 từ)
-Chỉ trả về JSON thuần: {"seoTitle":"...","seoDescription":"...","slug":"...","tags":[...]}`,
+                content: await this.aiPrompts.lay('post.crawl-seo'),
               },
               {
                 role: 'user',

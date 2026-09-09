@@ -43,6 +43,7 @@ export class AiPromptsService {
       const g = map.get(p.key);
       return {
         key: p.key,
+        nhom: p.nhom,
         nhan: p.nhan,
         moTa: p.moTa,
         bien: p.bien,

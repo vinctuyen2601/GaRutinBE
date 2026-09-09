@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { AiPromptsService } from '../ai-prompts/ai-prompts.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
@@ -15,6 +16,7 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private readonly repo: Repository<Product>,
+    private readonly aiPrompts: AiPromptsService,
   ) {}
 
   findAll(
@@ -115,9 +117,7 @@ export class ProductsService {
       [
         {
           role: 'system',
-          content: `Bạn là chuyên gia viết mô tả sản phẩm cho trang trại Gà Rutin (garutin.com).
-Viết mô tả hấp dẫn, chuyên nghiệp cho sản phẩm gà rutin/trứng gà rutin, tập trung vào lợi ích và đặc điểm nổi bật.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+          content: await this.aiPrompts.lay('product.generate-description'),
         },
         {
           role: 'user',
@@ -152,9 +152,7 @@ Trả về JSON:
       [
         {
           role: 'system',
-          content: `Bạn là chuyên gia SEO cho website trang trại Gà Rutin (garutin.com).
-Tối ưu SEO cho trang sản phẩm gà rutin/trứng cút.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+          content: await this.aiPrompts.lay('product.optimize-seo'),
         },
         {
           role: 'user',
@@ -188,9 +186,7 @@ Trả về JSON:
       [
         {
           role: 'system',
-          content: `Bạn là chuyên gia viết mô tả sản phẩm cho trang trại Gà Rutin.
-Cải thiện mô tả sản phẩm: thêm thông tin hữu ích, cải thiện cấu trúc, tăng tính thuyết phục.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+          content: await this.aiPrompts.lay('product.improve-description'),
         },
         {
           role: 'user',
