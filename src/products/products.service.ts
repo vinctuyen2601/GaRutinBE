@@ -133,7 +133,7 @@ Trả về JSON:
 }`,
         },
       ],
-      { maxTokens: 2000, temperature: 0.7, profile: 'quality' },
+      { maxTokens: 2000, temperature: 0.7, profile: 'quality', jsonMode: true },
     );
 
     return parseJsonFromAI(text, 'products');
@@ -172,7 +172,7 @@ Trả về JSON:
 }`,
         },
       ],
-      { maxTokens: 1500, temperature: 0.3, profile: 'quality' },
+      { maxTokens: 1500, temperature: 0.3, profile: 'quality', jsonMode: true },
     );
 
     return parseJsonFromAI(text, 'products');
@@ -202,7 +202,7 @@ Trả về JSON:
 }`,
         },
       ],
-      { maxTokens: 2000, temperature: 0.5, profile: 'quality' },
+      { maxTokens: 2000, temperature: 0.5, profile: 'quality', jsonMode: true },
     );
 
     return parseJsonFromAI(text, 'products');

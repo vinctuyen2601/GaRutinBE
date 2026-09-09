@@ -120,6 +120,21 @@ export type LLMProfile = 'fast' | 'quality';
 
 interface CallOptions {
   maxTokens?: number;
+  /**
+   * Bắt nhà cung cấp trả về JSON hợp lệ, không phải văn xuôi.
+   *
+   * Dặn trong prompt là chưa đủ. Đã xảy ra thật với gpt-oss-120b: prompt in
+   * thẳng khuôn JSON, mô hình vẫn trả về bảng tự chấm điểm từng quy tắc bằng
+   * tiếng Anh và không có lấy một dấu ngoặc nhọn nào.
+   *
+   * Cả bốn nhà cung cấp đều nói giao thức OpenAI nên đều hiểu response_format.
+   * Nhà nào không hiểu thì trả 400, vòng lặp tự rơi sang nhà kế tiếp — mất một
+   * lựa chọn cho lần gọi đó, không hỏng cả lệnh.
+   *
+   * Lưu ý: chế độ này đòi chữ "json" phải xuất hiện đâu đó trong tin nhắn.
+   * Mọi prompt dùng nó đều đã có, nhưng viết prompt mới thì phải nhớ.
+   */
+  jsonMode?: boolean;
   temperature?: number;
   profile?: LLMProfile;
   /**
@@ -331,6 +346,7 @@ export async function callLLM(
     temperature = 0.7,
     profile = 'fast',
     timeoutMs = TIMEOUT_MS,
+    jsonMode = false,
   } = options;
   const attempts = buildAttempts(profile);
   const errors: string[] = [];
@@ -355,6 +371,12 @@ export async function callLLM(
           messages,
           max_tokens: maxTokens,
           temperature,
+          ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+          // gpt-oss có bước suy luận, và token suy luận TÍNH VÀO max_tokens.
+          // Prompt càng nhiều quy tắc thì nó càng suy luận dài rồi hết chỗ cho
+          // câu trả lời — đúng cách lệnh cải thiện mô tả sản phẩm đã hỏng.
+          // Việc ở đây là điền khuôn JSON, không cần nghĩ sâu.
+          ...(def.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
         }),
       });
 
