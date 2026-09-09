@@ -83,6 +83,12 @@ export class KeywordsController {
     return this.troLy.layGoiY(body?.keyword ?? '');
   }
 
+  /** Tìm gợi ý từ mọi từ khoá đang có, khỏi phải tự nghĩ từ gốc. */
+  @Post('goi-y/quet-sau')
+  quetSau(@Body() body: { soTuGoc?: number }) {
+    return this.troLy.quetSau(body?.soTuGoc ?? 12);
+  }
+
   @Post('goi-y/:id/nhan')
   nhanGoiY(@Param('id') id: string) {
     return this.troLy.nhanGoiY(id);

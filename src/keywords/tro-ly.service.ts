@@ -7,6 +7,7 @@ import { Post } from '../posts/entities/post.entity';
 import { TrackingService } from '../tracking/tracking.service';
 import { SearchService } from '../posts/search.service';
 import { SearchConsoleService } from './search-console.service';
+import { GoiYService } from './goi-y.service';
 import { timBaiKhop, ketLuan, quaChung, type KetQuaPhanTich } from './phan-tich';
 
 export interface DongPhanTich extends KetQuaPhanTich {
@@ -39,6 +40,7 @@ export class TroLyService {
     private readonly tracking: TrackingService,
     private readonly search: SearchService,
     private readonly gsc: SearchConsoleService,
+    private readonly goiY: GoiYService,
   ) {}
 
   /** Số người đọc từng bài, tra theo slug. */
@@ -126,22 +128,87 @@ export class TroLyService {
    * hai trường trước đây bị vứt đi: `peopleAlsoAsk` (câu hỏi THẬT người dùng gõ)
    * và `relatedSearches`. Không tốn thêm đồng nào vì vẫn là một lần gọi.
    */
+  /**
+   * Tìm từ khoá còn THIẾU quanh một từ gốc.
+   *
+   * Ba nguồn, đều là truy vấn thật của người dùng:
+   *   - Autocomplete: thứ Google gợi khi người ta gõ (miễn phí, không cần key)
+   *   - peopleAlsoAsk: câu hỏi thật kèm theo kết quả tìm kiếm
+   *   - relatedSearches: tìm kiếm liên quan Google đề xuất
+   *
+   * KHÔNG lấy tiêu đề bài của đối thủ dù cùng nằm trong phản hồi Serper: tiêu
+   * đề là câu văn, không phải truy vấn. Nhét chúng vào danh sách từ khoá sẽ làm
+   * loãng đúng thứ mà danh sách này sinh ra để làm — quyết định viết gì tiếp.
+   *
+   * Lọc bỏ từ khoá ĐÃ CÓ BÀI nhắm vào: giá trị của danh sách này là chỉ ra chỗ
+   * thiếu, chứ không phải liệt kê lại thứ mình đã có.
+   */
   async layGoiY(tuKhoa: string) {
-    const { cauHoi, lienQuan } = await this.search.layGoiYTuKhoa(tuKhoa);
-    const daCo = new Set(
-      (await this.kwRepo.find({ select: ['keyword'] })).map((k) => k.keyword.toLowerCase()),
-    );
+    const [tuDong, serper] = await Promise.all([
+      this.goiY.tuDong(tuKhoa),
+      this.search.layGoiYTuKhoa(tuKhoa),
+    ]);
+
+    const [posts, doc, kws, daGoiY] = await Promise.all([
+      this.postRepo.find({ select: ['slug', 'title'] }),
+      this.nguoiDocTheoSlug(),
+      this.kwRepo.find({ select: ['keyword'] }),
+      this.ggRepo.find({ select: ['keyword'] }),
+    ]);
+    const daCo = new Set([
+      ...kws.map((k) => k.keyword.toLowerCase()),
+      ...daGoiY.map((g) => g.keyword.toLowerCase()),
+    ]);
+
+    const nguon: [string[], string][] = [
+      [tuDong, 'tu-dong'],
+      [serper.cauHoi, 'cau-hoi'],
+      [serper.lienQuan, 'lien-quan'],
+    ];
+
     let them = 0;
-    for (const [ds, loai] of [[cauHoi, 'cau-hoi'], [lienQuan, 'lien-quan']] as const) {
+    let boQuaViDaCoBai = 0;
+    for (const [ds, loai] of nguon) {
       for (const g of ds) {
-        const t = g.trim();
+        const t = (g ?? '').trim();
         if (!t || daCo.has(t.toLowerCase())) continue;
-        if (await this.ggRepo.findOne({ where: { keyword: t } })) continue;
-        await this.ggRepo.save(this.ggRepo.create({ keyword: t, tuKhoaGoc: tuKhoa, loai }));
+        daCo.add(t.toLowerCase());
+        if (timBaiKhop(t, posts, doc).length > 0) {
+          boQuaViDaCoBai++;
+          continue;
+        }
+        await this.ggRepo.save(
+          this.ggRepo.create({ keyword: t, tuKhoaGoc: tuKhoa, loai }),
+        );
         them++;
       }
     }
-    return { them, cauHoi: cauHoi.length, lienQuan: lienQuan.length };
+    return {
+      them,
+      boQuaViDaCoBai,
+      tuDong: tuDong.length,
+      cauHoi: serper.cauHoi.length,
+      lienQuan: serper.lienQuan.length,
+    };
+  }
+
+  /**
+   * Quét sâu: tìm gợi ý từ MỌI từ khoá đang có trong hệ thống.
+   *
+   * Để admin không phải tự nghĩ ra từ gốc. Giới hạn số từ gốc mỗi lần chạy vì
+   * mỗi từ là hai lời gọi mạng, và Serper có hạn mức.
+   */
+  async quetSau(soTuGoc = 12) {
+    const kws = await this.kwRepo.find({
+      order: { impressions: 'DESC' },
+      take: soTuGoc,
+    });
+    let them = 0;
+    for (const k of kws) {
+      const r = await this.layGoiY(k.keyword);
+      them += r.them;
+    }
+    return { them, soTuGoc: kws.length };
   }
 
   /** Kéo số liệu thẳng từ Search Console, khỏi phải dán tay. */
