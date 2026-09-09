@@ -104,4 +104,22 @@ export class KeywordsController {
   boQuaGoiY(@Param('id') id: string) {
     return this.troLy.boQuaGoiY(id);
   }
+
+  /** Soạn phần bổ sung bằng AI. */
+  @Post('bo-sung')
+  soanBoSung(@Body() body: { keyword: string; slugs: string[] }) {
+    return this.troLy.soanBoSung(body?.keyword, body?.slugs ?? []);
+  }
+
+  /** Đường làm tay, dùng khi gọi LLM qua API hỏng hoặc hết hạn mức. */
+  @Post('bo-sung/prompt')
+  async promptBoSung(@Body() body: { keyword: string; slugs: string[] }) {
+    const { system, user } = await this.troLy.promptBoSung(body?.keyword, body?.slugs ?? []);
+    return { system, user, prompt: `${system}\n\n---\n\n${user}` };
+  }
+
+  @Post('bo-sung/apply')
+  applyBoSung(@Body() body: { text: string }) {
+    return this.troLy.docKetQuaBoSung(body?.text ?? '');
+  }
 }

@@ -8,7 +8,9 @@ import { TrackingService } from '../tracking/tracking.service';
 import { SearchService } from '../posts/search.service';
 import { SearchConsoleService } from './search-console.service';
 import { GoiYService } from './goi-y.service';
-import { timBaiKhop, timBaiNhacToi, ketLuan, quaChung, type KetQuaPhanTich } from './phan-tich';
+import { timBaiKhop, timBaiNhacToi, ketLuan, quaChung, rutDanY, type KetQuaPhanTich } from './phan-tich';
+import { callLLM, parseJsonFromAI } from '../common/llm';
+import { AiPromptsService } from '../ai-prompts/ai-prompts.service';
 
 export interface DongPhanTich extends KetQuaPhanTich {
   id: string;
@@ -21,6 +23,40 @@ export interface DongPhanTich extends KetQuaPhanTich {
   ghiChu: string | null;
   daBoQua: boolean;
   lyDoBoQua: string | null;
+}
+
+export interface KetQuaBoSung {
+  slug: string;
+  tieuDeBai: string;
+  /** Gợi ý chèn vào chỗ nào trong bài. */
+  viTri: string;
+  html: string;
+  lyDo: string;
+  /** true khi không bài nào hợp — đừng nhét bừa, viết bài mới thì hơn. */
+  nenVietMoi: boolean;
+}
+
+/**
+ * Giữ lại các thẻ an toàn, bỏ phần còn lại.
+ *
+ * Danh sách CHO PHÉP chứ không phải danh sách cấm: cấm thì luôn sót, và thứ
+ * sót lại đi thẳng vào trang công khai.
+ */
+const THE_CHO_PHEP = new Set(['h2', 'h3', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'br']);
+
+function locHtml(html: string): string {
+  return html
+    .replace(/<\s*(script|style|iframe|object|embed)[\s\S]*?<\/\s*\1\s*>/gi, '')
+    .replace(/<\/?\s*([a-zA-Z0-9]+)([^>]*)>/g, (the, ten: string, thuoc: string) => {
+      if (!THE_CHO_PHEP.has(ten.toLowerCase())) return '';
+      // Thẻ <a> chỉ giữ href nội bộ; bỏ mọi thuộc tính khác (kể cả onclick).
+      if (ten.toLowerCase() === 'a' && !the.startsWith('</')) {
+        const href = /href\s*=\s*"(\/[^"]*)"/i.exec(thuoc)?.[1];
+        return href ? `<a href="${href}">` : '<a>';
+      }
+      return the.startsWith('</') ? `</${ten.toLowerCase()}>` : `<${ten.toLowerCase()}>`;
+    })
+    .trim();
 }
 
 /**
@@ -43,6 +79,7 @@ export class TroLyService {
     private readonly search: SearchService,
     private readonly gsc: SearchConsoleService,
     private readonly goiY: GoiYService,
+    private readonly aiPrompts: AiPromptsService,
   ) {}
 
   /** Số người đọc từng bài, tra theo slug. */
@@ -110,6 +147,74 @@ export class TroLyService {
           UU_TIEN[a.viec] - UU_TIEN[b.viec] ||
           (b.impressions ?? -1) - (a.impressions ?? -1),
       );
+  }
+
+  /**
+   * Soạn prompt xin AI viết phần còn thiếu cho một từ khoá.
+   *
+   * Chỉ gửi DÀN Ý của các bài ứng viên, không gửi nội dung đầy đủ. Đo trên bài
+   * `lam-chuong-ga-rutin`: dàn ý 304 ký tự, nội dung 3.172 — gấp mười lần. Ba
+   * bài nội dung đầy đủ là gần 10.000 ký tự vào prompt, đủ để lần gọi vượt trần
+   * 30 giây của CloudFront và trả về 504 mà log ứng dụng không ghi gì.
+   *
+   * Dàn ý cũng đủ để AI quyết định: nó chỉ cần biết bài đã nói những gì để
+   * không viết trùng, chứ không cần đọc từng câu.
+   */
+  async promptBoSung(tuKhoa: string, slugs: string[]): Promise<{ system: string; user: string }> {
+    const kw = (tuKhoa ?? '').trim();
+    if (!kw) throw new BadRequestException('Thiếu từ khoá');
+
+    const posts = await this.postRepo.find({
+      select: ['id', 'slug', 'title', 'content'],
+      where: { redirectTo: IsNull() },
+    });
+    // Giữ đúng thứ tự client gửi lên — đó là thứ tự bảng đã xếp theo độ khớp.
+    const ungVien = slugs
+      .map((sl) => posts.find((b) => b.slug === sl))
+      .filter((b): b is Post => !!b)
+      .slice(0, 3);
+    if (ungVien.length === 0) {
+      throw new BadRequestException('Không tìm thấy bài nào trong danh sách gửi lên');
+    }
+
+    const system = await this.aiPrompts.lay('keyword.bo-sung');
+    const moTa = ungVien
+      .map((b, i) => {
+        const danY = rutDanY(b.content);
+        const muc = danY.length ? danY.map((h) => `  - ${h}`).join('\n') : '  (bài chưa có heading)';
+        return `Bài ${i + 1}\nslug: ${b.slug}\nTiêu đề: ${b.title}\nDàn ý hiện có:\n${muc}`;
+      })
+      .join('\n\n');
+
+    const user = `Từ khoá cần phủ: ${kw}\n\nCác bài đã có trên web:\n\n${moTa}\n\nChọn một bài và soạn phần HTML còn thiếu.`;
+    return { system, user };
+  }
+
+  /** Đọc kết quả AI trả về cho phần bổ sung. */
+  docKetQuaBoSung(text: string): KetQuaBoSung {
+    const kq = parseJsonFromAI<Partial<KetQuaBoSung>>(text, 'keyword.bo-sung');
+    return {
+      slug: String(kq.slug ?? ''),
+      tieuDeBai: String(kq.tieuDeBai ?? ''),
+      viTri: String(kq.viTri ?? ''),
+      // Lọc thẻ ngay tại đây chứ không tin prompt: nội dung này admin dán thẳng
+      // vào bài rồi xuất ra web công khai, một thẻ <script> lọt qua là XSS thật.
+      html: locHtml(String(kq.html ?? '')),
+      lyDo: String(kq.lyDo ?? ''),
+      nenVietMoi: kq.nenVietMoi === true,
+    };
+  }
+
+  /** Gọi thẳng LLM. Hỏng thì CMS vẫn còn đường làm tay qua promptBoSung. */
+  async soanBoSung(tuKhoa: string, slugs: string[]): Promise<KetQuaBoSung> {
+    const { system, user } = await this.promptBoSung(tuKhoa, slugs);
+    const raw = await callLLM(
+      [{ role: 'system', content: system }, { role: 'user', content: user }],
+      // profile 'fast' + 25s: prompt chỉ có dàn ý nên ngắn, và phải trả lời
+      // xong trước trần 30 giây của CloudFront.
+      { maxTokens: 2500, temperature: 0.5, profile: 'fast', timeoutMs: 25_000 },
+    );
+    return this.docKetQuaBoSung(raw);
   }
 
   /**

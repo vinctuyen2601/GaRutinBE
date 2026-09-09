@@ -10,6 +10,7 @@ import { TrackingModule } from '../tracking/tracking.module';
 import { SearchService } from '../posts/search.service';
 import { SearchConsoleService } from './search-console.service';
 import { GoiYService } from './goi-y.service';
+import { AiPromptsModule } from '../ai-prompts/ai-prompts.module';
 
 @Module({
   // Post và TrackingModule ở đây vì trợ lý phải ghép từ khoá với bài viết và
@@ -17,6 +18,8 @@ import { GoiYService } from './goi-y.service';
   imports: [
     TypeOrmModule.forFeature([Keyword, KeywordSuggestion, Post]),
     TrackingModule,
+    // Prompt soạn phần bổ sung sửa được từ CMS như mọi prompt khác.
+    AiPromptsModule,
   ],
   providers: [KeywordsService, TroLyService, SearchService, SearchConsoleService, GoiYService],
   controllers: [KeywordsController],

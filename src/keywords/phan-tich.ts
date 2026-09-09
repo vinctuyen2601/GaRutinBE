@@ -22,6 +22,29 @@ export interface BaiKhop {
   slug: string;
   title: string;
   nguoiDoc: number;
+  /**
+   * Các heading H2/H3 của bài.
+   *
+   * Để admin nhìn một cái là biết bài này nói gì và còn thiếu chỗ nào, không
+   * phải mở bài ra mới biết. Với dòng "bổ sung bài cũ" thì đây chính là thứ
+   * quyết định: bài "Làm Chuồng" có dàn ý 304 ký tự trong khi nội dung đầy đủ
+   * là 3.172 — đọc 8 dòng mất ba giây, đọc cả bài mất vài phút.
+   *
+   * Cũng là thứ để phát hiện bộ ghép chọn nhầm bài: dòng "cách nuôi gà rutin
+   * sinh sản" trỏ vào bài "Mua Gà Rutin Ở TP HCM" sai rành rành, và nhìn dàn ý
+   * là thấy ngay.
+   */
+  danY: string[];
+}
+
+/** Rút heading H2/H3 làm dàn ý. Bỏ thẻ con và khoảng trắng thừa. */
+export function rutDanY(html: string | null | undefined): string[] {
+  if (!html) return [];
+  return [...html.matchAll(/<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi)]
+    .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    // Cắt 12 mục: dàn ý dài hơn thế thì không còn là cái nhìn nhanh nữa.
+    .slice(0, 12);
 }
 
 export interface KetQuaPhanTich {
@@ -67,6 +90,7 @@ export function timBaiNhacToi(
       slug: x.b.slug,
       title: x.b.title,
       nguoiDoc: nguoiDoc[x.b.slug] ?? 0,
+      danY: rutDanY((x.b as { content?: string | null }).content),
     }));
 }
 
@@ -152,7 +176,7 @@ function tachTu(s: string): string[] {
  */
 export function timBaiKhop(
   tuKhoa: string,
-  baiViet: { id: string; slug: string; title: string }[],
+  baiViet: { id: string; slug: string; title: string; content?: string | null }[],
   nguoiDoc: Record<string, number>,
 ): BaiKhop[] {
   const tk = new Set(tachTu(tuKhoa));
@@ -178,6 +202,7 @@ export function timBaiKhop(
       slug: x.b.slug,
       title: x.b.title,
       nguoiDoc: nguoiDoc[x.b.slug] ?? 0,
+      danY: rutDanY((x.b as { content?: string | null }).content),
     }));
 }
 
