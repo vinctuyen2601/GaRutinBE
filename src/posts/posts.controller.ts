@@ -107,8 +107,8 @@ export class PostsController {
 
   @Post('admin/posts/ai/optimize-seo/prompt')
   @UseGuards(JwtAuthGuard)
-  promptOptimizeSeo(@Body() dto: OptimizeSeoDto) {
-    const { system, user } = this.service.promptOptimizeSeo(dto);
+  async promptOptimizeSeo(@Body() dto: OptimizeSeoDto) {
+    const { system, user } = await this.service.promptOptimizeSeo(dto);
     return { system, user, prompt: `${system}\n\n---\n\n${user}` };
   }
 
@@ -120,8 +120,8 @@ export class PostsController {
 
   @Post('admin/posts/ai/improve/prompt')
   @UseGuards(JwtAuthGuard)
-  promptImproveContent(@Body() dto: ImproveContentDto) {
-    const { system, user } = this.service.promptImproveContent(dto);
+  async promptImproveContent(@Body() dto: ImproveContentDto) {
+    const { system, user } = await this.service.promptImproveContent(dto);
     return { system, user, prompt: `${system}\n\n---\n\n${user}` };
   }
 

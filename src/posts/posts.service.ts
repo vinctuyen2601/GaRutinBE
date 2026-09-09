@@ -9,6 +9,7 @@ import { CrawlerService } from './crawler.service';
 import { SearchService } from './search.service';
 import { KeywordsService } from '../keywords/keywords.service';
 import { POST_TEMPLATES, getPostTemplate } from './post-templates';
+import { AiPromptsService } from '../ai-prompts/ai-prompts.service';
 
 @Injectable()
 export class PostsService {
@@ -18,6 +19,7 @@ export class PostsService {
     private readonly crawlerService: CrawlerService,
     private readonly searchService: SearchService,
     private readonly keywordsService: KeywordsService,
+    private readonly aiPrompts: AiPromptsService,
   ) {}
 
   async findPublished(params: { category?: string; page?: number; limit?: number; q?: string } = {}): Promise<{ data: Post[]; total: number; page: number; limit: number }> {
@@ -212,7 +214,7 @@ Trả về JSON với cấu trúc:
    * sớm muộn hai bên lệch nhau, mà lệch kiểu này không báo lỗi — chỉ cho ra kết
    * quả khác nhau tuỳ hôm đó bấm nút nào.
    */
-  promptOptimizeSeo(dto: OptimizeSeoDto): { system: string; user: string } {
+  async promptOptimizeSeo(dto: OptimizeSeoDto): Promise<{ system: string; user: string }> {
     const contentSnippet = dto.content
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -224,19 +226,9 @@ Trả về JSON với cấu trúc:
       ? `\n- Bài viết đang theo cấu trúc "${template.name}" (${template.description}) — manualSuggestions PHẢI phù hợp với cấu trúc này, KHÔNG đề xuất thêm FAQ nếu cấu trúc này không cần FAQ, không đề xuất CTA cứng nếu cấu trúc yêu cầu CTA lồng tự nhiên`
       : '';
 
-    const systemPrompt = `Bạn là chuyên gia SEO cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản), trứng cút, kỹ thuật chăn nuôi.
-Nhiệm vụ: Tối ưu hóa metadata SEO cho bài viết, giúp rank cao trên Google Việt Nam.
-
-Quy tắc NGHIÊM NGẶT:
-- seoTitle: 50-60 ký tự — từ khóa chính PHẢI xuất hiện ở đầu, dùng power words (Bí quyết/Top N/Cách/Hướng dẫn), tránh dùng tên brand
-- seoDescription: 145-158 ký tự — cấu trúc: Hook(vấn đề người dùng) + Giải pháp ngắn + CTA (Khám phá/Tìm hiểu ngay). KHÔNG bắt đầu bằng "Bài viết" hay "Chúng tôi"
-- slug: 3-6 từ tiếng Việt không dấu, có từ khóa chính, chỉ a-z0-9 và dấu gạch ngang, không có "bai-viet" hay "huong-dan" ở đầu
-- tags: mảng 5-7 tags — 2 broad keyword ngắn (1-2 từ) + 3-4 long-tail keyword (3-5 từ) — là những gì người Việt hay tìm trên Google về gà rutin
-- manualSuggestions: mảng gợi ý cụ thể cần chỉnh tay — ưu tiên: (1) thêm internal link đến /san-pham hoặc /blog/category/X với anchor text tự nhiên, (2) thêm H3 câu hỏi "?" + đoạn trả lời ngắn để có FAQ schema, (3) bổ sung số liệu/thống kê cụ thể về gà rutin${templateNote}
-- suggestions: mô tả ngắn những thay đổi AI đã thực hiện
-
-Chỉ trả về JSON thuần (không markdown):
-{"seoTitle":"...","seoDescription":"...","slug":"...","tags":[...],"suggestions":[...],"manualSuggestions":[]}`;
+    // Prompt lấy từ registry để CMS sửa được; không có bản ghi đè
+    // thì rơi về đúng nội dung mặc định trong src/ai-prompts/registry.ts.
+    const systemPrompt = await this.aiPrompts.lay('post.optimize-seo', { templateNote });
 
     const userPrompt = `Tiêu đề bài viết: ${dto.title}
 
@@ -287,7 +279,7 @@ Thông tin hiện tại (có thể rỗng):
     suggestions: string[];
     manualSuggestions: string[];
   }> {
-    const { system, user } = this.promptOptimizeSeo(dto);
+    const { system, user } = await this.promptOptimizeSeo(dto);
     const rawText = await callLLM(
       [{ role: 'system', content: system }, { role: 'user', content: user }],
       // Trần token phải rộng hơn nhiều so với độ dài JSON mong đợi (~500 token).
@@ -322,7 +314,7 @@ Thông tin hiện tại (có thể rỗng):
    * Cùng lý do như promptOptimizeSeo: đường gọi API và đường làm tay phải dùng
    * chung một bộ prompt, nếu không hai bên lệch nhau mà không có gì báo.
    */
-  promptImproveContent(dto: ImproveContentDto): { system: string; user: string } {
+  async promptImproveContent(dto: ImproveContentDto): Promise<{ system: string; user: string }> {
     const issuesList = (dto.issues ?? []).map((i) => `- ${i}`).join('\n');
     const scoreContext = dto.contentScore !== undefined
       ? `Điểm chất lượng hiện tại: ${dto.contentScore}/100.\n`
@@ -335,24 +327,9 @@ Thông tin hiện tại (có thể rỗng):
 5. Nếu thiếu CTA: thêm link tự nhiên <a href="/san-pham">xem sản phẩm</a> hoặc đề cập "Gà Rutin"
 6. Nếu thiếu internal link: thêm ít nhất 1 <a href="/blog/...">bài liên quan</a> phù hợp ngữ cảnh`;
 
-    const systemPrompt = `Bạn là chuyên gia biên tập nội dung cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản).
-Nhiệm vụ: Cải thiện bài viết HTML để tăng điểm chất lượng nội dung, giúp rank tốt hơn trên Google Việt Nam.
-
-NGUYÊN TẮC BẮT BUỘC:
-1. Fix TOÀN BỘ các vấn đề được liệt kê trong danh sách
-2. Giữ nguyên thông tin cốt lõi — KHÔNG bịa số liệu hay thông tin không có trong bài gốc
-3. Thêm context thực tế: giá VND (200k, 500k...), địa danh VN, mùa vụ, kinh nghiệm nuôi gà rutin thực tế
-${structureRule}
-7. Giọng văn: thân thiện, chuyên môn — phù hợp người nuôi gia cầm Việt Nam
-8. Nếu bài ngắn (< 800 từ): mở rộng các section hiện có, KHÔNG thêm nội dung vô nghĩa
-9. Output PHẢI là HTML hợp lệ (<h2>, <h3>, <p>, <ul>, <ol>, <li>, <a>, <strong>, <table> nếu cần) — KHÔNG dùng markdown
-
-FORMAT OUTPUT BẮT BUỘC (giữ đúng 3 dòng delimiter):
-SUMMARY: [một dòng tóm tắt những gì đã thêm/sửa, ví dụ: Đã thêm FAQ 3 câu, +400 từ, CTA /san-pham, 1 internal link]
-===EXCERPT===
-[tóm tắt 1-2 câu hấp dẫn cho bài viết]
-===HTML===
-[toàn bộ HTML nội dung bài viết đã cải thiện]`;
+    // Prompt lấy từ registry để CMS sửa được; không có bản ghi đè
+    // thì rơi về đúng nội dung mặc định trong src/ai-prompts/registry.ts.
+    const systemPrompt = await this.aiPrompts.lay('post.improve', { structureRule });
 
     const cleanContent = dto.content
       .replace(/\s+style="[^"]*"/gi, '')
@@ -425,7 +402,7 @@ ${cleanContent}`;
     excerpt: string;
     summary: string;
   }> {
-    const { system, user } = this.promptImproveContent(dto);
+    const { system, user } = await this.promptImproveContent(dto);
     const rawText = await callLLM(
       [{ role: 'system', content: system }, { role: 'user', content: user }],
       { maxTokens: 6000, temperature: 0.4, profile: 'quality' },
