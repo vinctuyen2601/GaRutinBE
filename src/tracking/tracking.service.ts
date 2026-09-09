@@ -132,19 +132,31 @@ export class TrackingService {
                        'trực tiếp')                       AS source,
               COALESCE(NULLIF(v.utm_campaign, ''), '—')   AS campaign,
               CASE
-                -- Có utm_medium trả tiền → quảng cáo. Xét medium trước source vì
+                -- Có utm_medium trả tiền → quảng cáo. Xét medium trước mọi thứ vì
                 -- cùng một nguồn "google" vừa có thể là quảng cáo vừa có thể là
                 -- SEO, và đó đúng là cặp dễ đọc nhầm nhất.
                 WHEN LOWER(COALESCE(v.utm_medium, '')) IN ('cpc','ppc','paid','paid_social')
                   THEN 'quảng cáo'
-                -- Có utm nhưng không phải trả tiền: bài đăng, tin nhắn, email.
-                WHEN NULLIF(v.utm_source, '') IS NOT NULL
+                -- Chiến dịch của shop nhận diện bằng utm_CAMPAIGN, không phải
+                -- utm_source. Công cụ tạo link quảng cáo bắt buộc điền chiến
+                -- dịch, nên có utm_source mà trống campaign thì chắc chắn không
+                -- phải link mình tạo — mà là bên khác tự gắn vào.
+                WHEN NULLIF(v.utm_campaign, '') IS NOT NULL
                   THEN 'chiến dịch'
-                -- Không có utm mà đến từ máy tìm kiếm → SEO.
-                WHEN v.referrer_host ~ '^(www\.)?(google|bing|coccoc|duckduckgo|yandex)\.' 
+                -- ChatGPT và các trợ lý AI tự thêm ?utm_source=chatgpt.com vào
+                -- link chúng đưa cho người dùng. Xếp chung vào "chiến dịch" là
+                -- báo cáo sai: shop không hề chạy chiến dịch nào ở đó, mà đây
+                -- lại là kênh đáng theo dõi riêng vì đang lớn dần.
+                WHEN LOWER(COALESCE(NULLIF(v.utm_source, ''), v.referrer_host, ''))
+                     ~ '(chatgpt|openai|perplexity|copilot|gemini|claude)'
+                  THEN 'trợ lý AI'
+                -- Máy tìm kiếm, kể cả khi tên nằm ở utm_source do bên kia gắn.
+                WHEN COALESCE(NULLIF(v.utm_source, ''), v.referrer_host, '')
+                     ~ '^(www\.)?(google|bing|coccoc|duckduckgo|yandex)\.'
                   OR v.referrer_host IN ('search.yahoo.com','vn.search.yahoo.com')
                   THEN 'tự nhiên (SEO)'
-                WHEN NULLIF(v.referrer_host, '') IS NOT NULL THEN 'giới thiệu'
+                WHEN COALESCE(NULLIF(v.utm_source, ''), NULLIF(v.referrer_host, '')) IS NOT NULL
+                  THEN 'giới thiệu'
                 ELSE 'trực tiếp'
               END                                          AS loai,
               COUNT(*)                                    AS visits,
