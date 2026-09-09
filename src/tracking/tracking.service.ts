@@ -23,6 +23,19 @@ function hostCua(url?: string): string | null {
   }
 }
 
+/**
+ * Điều kiện "một lượt xem thật".
+ *
+ * Từ khi có phễu mua hàng, bảng page_visits chứa cả add_to_cart và
+ * begin_checkout. Đếm tất tần tật thì mỗi lần khách bấm thêm giỏ lại thành một
+ * "lượt truy cập" của trang sản phẩm, và tổng lượt truy cập phồng lên theo số
+ * người mua — càng bán được nhiều thì số liệu càng sai.
+ *
+ * Bảng nguồn và bảng phễu đã lọc như vậy từ đầu; ba thống kê dưới đây thì
+ * chưa, nên hai bên nói hai con số khác nhau về cùng một ngày.
+ */
+const LUOT_XEM_THAT = "v.event = 'view' AND v.is_bot = false";
+
 const dateStart = (d: string) => d + 'T00:00:00+07:00';
 const dateEnd   = (d: string) => d + 'T23:59:59+07:00';
 
@@ -156,7 +169,7 @@ export class TrackingService {
 
   async getVisitStats(from?: string, to?: string) {
     const buildBase = () => {
-      const qb = this.visitRepo.createQueryBuilder('v');
+      const qb = this.visitRepo.createQueryBuilder('v').where(LUOT_XEM_THAT);
       if (from) qb.andWhere('v.created_at >= :from', { from: dateStart(from) });
       if (to) qb.andWhere('v.created_at <= :to', { to: dateEnd(to) });
       return qb;
@@ -213,7 +226,8 @@ export class TrackingService {
       .select(`FLOOR(EXTRACT(HOUR FROM v.created_at ${GIO_VN}) / 4)::int`, 'bucket')
       .addSelect('COUNT(*)', 'visits')
       .addSelect('COUNT(DISTINCT v.ip)', 'visitors')
-      .groupBy('1');
+      .groupBy('1')
+      .where(LUOT_XEM_THAT);
     if (from) visitQb.andWhere('v.created_at >= :from', { from: dateStart(from) });
     if (to) visitQb.andWhere('v.created_at <= :to', { to: dateEnd(to) });
 
@@ -335,7 +349,19 @@ export class TrackingService {
          FROM products p
          LEFT JOIN traffic t ON t.slug = p.slug
          LEFT JOIN sales s   ON s.slug = p.slug
-        WHERE COALESCE(t.viewers, 0) > 0 OR COALESCE(s.quantity_sold, 0) > 0
+        -- Hiện dòng khi có BẤT KỲ dấu hiệu nào, không chỉ khi có lượt xem.
+        --
+        -- Điều kiện cũ chỉ nhận "có người xem trang sản phẩm HOẶC đã bán", nên
+        -- một sản phẩm được thêm giỏ và mang sang trang đặt hàng mà khách chưa
+        -- từng mở trang chi tiết thì BIẾN MẤT khỏi bảng, dù dữ liệu đã ghi đủ.
+        --
+        -- Đó không phải trường hợp hiếm: nút thêm giỏ nằm ngay trên thẻ sản
+        -- phẩm ở trang danh sách và trang chủ, và luồng video cho mua thẳng —
+        -- cả ba đường đều không đi qua trang chi tiết sản phẩm.
+        WHERE COALESCE(t.viewers, 0) > 0
+           OR COALESCE(t.carters, 0) > 0
+           OR COALESCE(t.checkouters, 0) > 0
+           OR COALESCE(s.quantity_sold, 0) > 0
         ORDER BY viewers DESC, quantity_sold DESC`,
       params,
     );
@@ -360,7 +386,8 @@ export class TrackingService {
       .addSelect('COUNT(*)', 'visits')
       .addSelect('COUNT(DISTINCT v.ip)', 'unique_visitors')
       .groupBy('v.path')
-      .orderBy('visits', 'DESC');
+      .orderBy('visits', 'DESC')
+      .where(LUOT_XEM_THAT);
 
     if (opts.from) qb.andWhere('v.created_at >= :from', { from: dateStart(opts.from) });
     if (opts.to) qb.andWhere('v.created_at <= :to', { to: dateEnd(opts.to) });
