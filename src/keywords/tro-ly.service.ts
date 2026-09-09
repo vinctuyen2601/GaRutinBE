@@ -64,7 +64,7 @@ export class TroLyService {
   async bangPhanTich(): Promise<DongPhanTich[]> {
     const [kws, posts, doc] = await Promise.all([
       this.kwRepo.find(),
-      this.postRepo.find({ select: ['slug', 'title'] }),
+      this.postRepo.find({ select: ['id', 'slug', 'title'] }),
       this.nguoiDocTheoSlug(),
     ]);
 
@@ -150,7 +150,7 @@ export class TroLyService {
     ]);
 
     const [posts, doc, kws, daGoiY] = await Promise.all([
-      this.postRepo.find({ select: ['slug', 'title'] }),
+      this.postRepo.find({ select: ['id', 'slug', 'title'] }),
       this.nguoiDocTheoSlug(),
       this.kwRepo.find({ select: ['keyword'] }),
       this.ggRepo.find({ select: ['keyword'] }),

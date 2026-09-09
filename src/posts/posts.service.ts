@@ -108,6 +108,46 @@ export class PostsService {
     }
   }
 
+  /**
+   * Gộp nhiều bài về một bài giữ lại, trong một lần.
+   *
+   * Có mặt vì gộp thủ công từng bài là 17 lần mở-chọn-lưu cho riêng cụm "mua gà
+   * rutin [quận]" — đủ mệt để người ta bỏ dở giữa chừng, và bỏ dở thì còn tệ
+   * hơn không làm: một nửa số bài chuyển hướng, một nửa vẫn tranh nhau.
+   *
+   * Vẫn đi qua cùng bộ kiểm tra như sửa từng bài, nên không có đường tắt nào
+   * lách được các ràng buộc về vòng lặp và chuỗi chuyển hướng.
+   */
+  async gopBai(dto: { giuLai: string; gopVao: string[] }): Promise<{
+    daGop: string[];
+    loi: { slug: string; lyDo: string }[];
+  }> {
+    const dich = await this.repo.findOne({ where: { slug: dto.giuLai } });
+    if (!dich) throw new NotFoundException(`Không có bài nào với slug "${dto.giuLai}"`);
+
+    const daGop: string[] = [];
+    const loi: { slug: string; lyDo: string }[] = [];
+
+    for (const slug of dto.gopVao) {
+      const bai = await this.repo.findOne({ where: { slug } });
+      if (!bai) {
+        loi.push({ slug, lyDo: 'Không tìm thấy bài' });
+        continue;
+      }
+      try {
+        await this.kiemChuyenHuong(bai, dto.giuLai);
+        bai.redirectTo = dto.giuLai;
+        await this.repo.save(bai);
+        daGop.push(slug);
+      } catch (e: any) {
+        // Một bài lỗi không được làm hỏng cả lượt gộp — báo lại từng bài để
+        // người dùng biết cái nào chưa xong thay vì phải đoán.
+        loi.push({ slug, lyDo: e.message });
+      }
+    }
+    return { daGop, loi };
+  }
+
   async update(id: string, dto: UpdatePostDto): Promise<Post> {
     const post = await this.findById(id);
     if (!post) throw new NotFoundException('Bài viết không tồn tại');

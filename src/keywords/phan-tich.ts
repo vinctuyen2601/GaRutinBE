@@ -16,6 +16,8 @@ export type ViecNenLam =
   | 'chua-du-lieu';
 
 export interface BaiKhop {
+  /** Cần cho CMS mở thẳng trang sửa bài — /posts/:id/edit dùng id, không dùng slug. */
+  id: string;
   slug: string;
   title: string;
   nguoiDoc: number;
@@ -109,7 +111,7 @@ function tachTu(s: string): string[] {
  */
 export function timBaiKhop(
   tuKhoa: string,
-  baiViet: { slug: string; title: string }[],
+  baiViet: { id: string; slug: string; title: string }[],
   nguoiDoc: Record<string, number>,
 ): BaiKhop[] {
   const tk = new Set(tachTu(tuKhoa));
@@ -131,6 +133,7 @@ export function timBaiKhop(
     .filter((x) => x.tiLe >= 0.75 && (tk.size < 2 || x.chung >= 2))
     .sort((a, b) => (nguoiDoc[b.b.slug] ?? 0) - (nguoiDoc[a.b.slug] ?? 0))
     .map((x) => ({
+      id: x.b.id,
       slug: x.b.slug,
       title: x.b.title,
       nguoiDoc: nguoiDoc[x.b.slug] ?? 0,

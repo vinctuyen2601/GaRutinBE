@@ -53,6 +53,13 @@ export class PostsController {
     return this.service.create(dto);
   }
 
+  /** Gộp nhiều bài về một bài trong một lần. */
+  @Post('admin/posts/gop')
+  @UseGuards(JwtAuthGuard)
+  gopBai(@Body() dto: { giuLai: string; gopVao: string[] }) {
+    return this.service.gopBai(dto);
+  }
+
   @Patch('admin/posts/:id')
   @UseGuards(JwtAuthGuard)
   update(@Param('id') id: string, @Body() dto: UpdatePostDto) {
