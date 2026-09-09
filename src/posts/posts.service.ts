@@ -204,14 +204,15 @@ Trả về JSON với cấu trúc:
     return parseJsonFromAI(text, 'generateContent');
   }
 
-  async optimizeSeo(dto: OptimizeSeoDto): Promise<{
-    seoTitle: string;
-    seoDescription: string;
-    slug: string;
-    tags: string[];
-    suggestions: string[];
-    manualSuggestions: string[];
-  }> {
+  /**
+   * Dựng prompt tối ưu SEO, tách khỏi việc gọi LLM.
+   *
+   * Tách ra để đường gọi API và đường làm tay (copy prompt sang chat AI rồi dán
+   * kết quả về) dùng CHUNG đúng một bộ prompt. Chép prompt sang chỗ khác thì
+   * sớm muộn hai bên lệch nhau, mà lệch kiểu này không báo lỗi — chỉ cho ra kết
+   * quả khác nhau tuỳ hôm đó bấm nút nào.
+   */
+  promptOptimizeSeo(dto: OptimizeSeoDto): { system: string; user: string } {
     const contentSnippet = dto.content
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -248,8 +249,47 @@ Thông tin hiện tại (có thể rỗng):
 - slug hiện tại: ${dto.slug || '(chưa có)'}
 - tags hiện tại: ${dto.tags?.join(', ') || '(chưa có)'}`;
 
+    return { system: systemPrompt, user: userPrompt };
+  }
+
+  /**
+   * Đọc kết quả SEO từ văn bản AI trả về.
+   *
+   * Dùng chung cho cả hai đường, nên dán tay hay gọi API đều đi qua đúng một bộ
+   * kiểm tra: thiếu trường thành rỗng, tags không phải mảng thành mảng rỗng,
+   * JSON hỏng thì báo cùng một lỗi.
+   */
+  docKetQuaSeo(rawText: string): {
+    seoTitle: string;
+    seoDescription: string;
+    slug: string;
+    tags: string[];
+    suggestions: string[];
+    manualSuggestions: string[];
+  } {
+    const parsed = parseJsonFromAI<Record<string, any>>(rawText, 'optimizeSeo');
+
+    return {
+      seoTitle: parsed.seoTitle ?? '',
+      seoDescription: parsed.seoDescription ?? '',
+      slug: parsed.slug ?? '',
+      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+      manualSuggestions: Array.isArray(parsed.manualSuggestions) ? parsed.manualSuggestions : [],
+    };
+  }
+
+  async optimizeSeo(dto: OptimizeSeoDto): Promise<{
+    seoTitle: string;
+    seoDescription: string;
+    slug: string;
+    tags: string[];
+    suggestions: string[];
+    manualSuggestions: string[];
+  }> {
+    const { system, user } = this.promptOptimizeSeo(dto);
     const rawText = await callLLM(
-      [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+      [{ role: 'system', content: system }, { role: 'user', content: user }],
       // Trần token phải rộng hơn nhiều so với độ dài JSON mong đợi (~500 token).
       // Lý do: gpt-oss-120b là mô hình reasoning và token suy luận bị TÍNH VÀO
       // max_tokens, nên phần lớn hạn mức bị phần suy luận ăn mất và JSON hiện ra
@@ -272,23 +312,17 @@ Thông tin hiện tại (có thể rỗng):
     // parseJsonFromAI (src/common/llm.ts) thay cho bản tự viết: nó thử thêm
     // hai cách nữa — bóc code block nằm giữa chuỗi, và sửa xuống dòng lọt trong
     // chuỗi JSON — rồi tự ghi log kèm độ dài và ném lỗi khi chịu thua.
-    const parsed = parseJsonFromAI<Record<string, any>>(rawText, 'optimizeSeo');
-
-    return {
-      seoTitle: parsed.seoTitle ?? '',
-      seoDescription: parsed.seoDescription ?? '',
-      slug: parsed.slug ?? '',
-      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
-      manualSuggestions: Array.isArray(parsed.manualSuggestions) ? parsed.manualSuggestions : [],
-    };
+    return this.docKetQuaSeo(rawText);
   }
 
-  async improveContent(dto: ImproveContentDto): Promise<{
-    content: string;
-    excerpt: string;
-    summary: string;
-  }> {
+
+  /**
+   * Dựng prompt cải thiện nội dung, tách khỏi việc gọi LLM.
+   *
+   * Cùng lý do như promptOptimizeSeo: đường gọi API và đường làm tay phải dùng
+   * chung một bộ prompt, nếu không hai bên lệch nhau mà không có gì báo.
+   */
+  promptImproveContent(dto: ImproveContentDto): { system: string; user: string } {
     const issuesList = (dto.issues ?? []).map((i) => `- ${i}`).join('\n');
     const scoreContext = dto.contentScore !== undefined
       ? `Điểm chất lượng hiện tại: ${dto.contentScore}/100.\n`
@@ -336,11 +370,24 @@ ${issuesList || '- Tổng thể cải thiện chất lượng nội dung'}
 Nội dung HTML hiện tại:
 ${cleanContent}`;
 
-    const rawText = await callLLM(
-      [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-      { maxTokens: 6000, temperature: 0.4, profile: 'quality' },
-    );
+    return { system: systemPrompt, user: userPrompt };
+  }
 
+  /**
+   * Đọc kết quả cải thiện nội dung từ văn bản AI trả về.
+   *
+   * KHÔNG phải JSON như phần SEO, mà là định dạng phân cách ===HTML=== và
+   * ===EXCERPT===. Lý do giữ nguyên: bài viết là HTML dài, nhét vào chuỗi JSON
+   * thì mọi dấu nháy và xuống dòng đều phải thoát, và chỉ cần mô hình quên một
+   * dấu là hỏng cả bài. Phân cách bằng dòng đánh dấu thì bền hơn hẳn.
+   *
+   * Người dán tay cũng phải theo đúng định dạng này — prompt đã ghi rõ.
+   */
+  docKetQuaImprove(rawText: string): {
+    content: string;
+    excerpt: string;
+    summary: string;
+  } {
     // Parse delimiter format
     const htmlDelimiter = '===HTML===';
     const excerptDelimiter = '===EXCERPT===';
@@ -372,6 +419,20 @@ ${cleanContent}`;
 
     throw new Error('AI trả về dữ liệu không hợp lệ, thử lại');
   }
+
+  async improveContent(dto: ImproveContentDto): Promise<{
+    content: string;
+    excerpt: string;
+    summary: string;
+  }> {
+    const { system, user } = this.promptImproveContent(dto);
+    const rawText = await callLLM(
+      [{ role: 'system', content: system }, { role: 'user', content: user }],
+      { maxTokens: 6000, temperature: 0.4, profile: 'quality' },
+    );
+    return this.docKetQuaImprove(rawText);
+  }
+
 
   async crawlToDrafts(dto: CrawlToDraftsDto): Promise<{
     keyword: string;

@@ -96,6 +96,41 @@ export class PostsController {
     return this.service.improveContent(dto);
   }
 
+  /*
+   * Đường LÀM TAY: lấy prompt ra để dán sang chat AI bên ngoài, rồi dán kết quả
+   * ngược lại vào đây.
+   *
+   * Có để dùng khi gọi LLM qua API bị lỗi hoặc hết hạn mức. Dùng đúng bộ prompt
+   * và đúng bộ đọc kết quả như đường tự động, nên kết quả cuối cùng giống hệt —
+   * chỉ khác ở chỗ ai là người bấm gửi tới AI.
+   */
+
+  @Post('admin/posts/ai/optimize-seo/prompt')
+  @UseGuards(JwtAuthGuard)
+  promptOptimizeSeo(@Body() dto: OptimizeSeoDto) {
+    const { system, user } = this.service.promptOptimizeSeo(dto);
+    return { system, user, prompt: `${system}\n\n---\n\n${user}` };
+  }
+
+  @Post('admin/posts/ai/optimize-seo/apply')
+  @UseGuards(JwtAuthGuard)
+  applyOptimizeSeo(@Body() body: { text: string }) {
+    return this.service.docKetQuaSeo(body?.text ?? '');
+  }
+
+  @Post('admin/posts/ai/improve/prompt')
+  @UseGuards(JwtAuthGuard)
+  promptImproveContent(@Body() dto: ImproveContentDto) {
+    const { system, user } = this.service.promptImproveContent(dto);
+    return { system, user, prompt: `${system}\n\n---\n\n${user}` };
+  }
+
+  @Post('admin/posts/ai/improve/apply')
+  @UseGuards(JwtAuthGuard)
+  applyImproveContent(@Body() body: { text: string }) {
+    return this.service.docKetQuaImprove(body?.text ?? '');
+  }
+
   @Post('admin/posts/ai/crawl-to-drafts')
   @UseGuards(JwtAuthGuard)
   crawlToDrafts(@Body() dto: CrawlToDraftsDto) {
