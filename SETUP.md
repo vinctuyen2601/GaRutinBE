@@ -145,3 +145,13 @@ server {
 sudo ln -s /etc/nginx/sites-available/garutin-be /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+---
+
+## Tuỳ chọn: kết nối Google Search Console
+
+Để trang **Từ khoá & SEO** tự lấy số liệu thay vì dán tay, xem
+[SETUP-SEARCH-CONSOLE.md](./SETUP-SEARCH-CONSOLE.md).
+
+Không bắt buộc — thiếu phần này thì mọi thứ khác vẫn chạy, chỉ là phải nhập số
+liệu bằng tay.
