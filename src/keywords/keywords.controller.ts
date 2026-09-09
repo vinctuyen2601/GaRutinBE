@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { TroLyService } from './tro-ly.service';
 import { KeywordsService } from './keywords.service';
 import { CreateKeywordDto, UpdateKeywordDto } from './dto/keyword.dto';
@@ -49,8 +49,14 @@ export class KeywordsController {
 
   /** Bảng chính: mỗi từ khoá kèm việc nên làm, xếp theo mức đáng làm. */
   @Get('phan-tich')
-  bangPhanTich() {
-    return this.troLy.bangPhanTich();
+  bangPhanTich(@Query('boQua') boQua?: string) {
+    return this.troLy.bangPhanTich(boQua === 'true');
+  }
+
+  /** Bỏ qua một từ khoá không liên quan, hoặc nhận lại. */
+  @Patch(':id/bo-qua')
+  doiBoQua(@Param('id') id: string, @Body() body: { boQua: boolean; lyDo?: string }) {
+    return this.troLy.doiBoQua(id, body?.boQua ?? true, body?.lyDo);
   }
 
   /** Nhận số liệu xuất từ Search Console; từ khoá lạ sẽ được tạo mới. */

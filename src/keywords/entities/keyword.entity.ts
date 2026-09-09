@@ -37,6 +37,18 @@ export class Keyword {
   @Column({ default: 'tay' })
   nguon: string;
 
+  /**
+   * Từ khoá không liên quan, không hiện trong bảng làm việc nữa.
+   *
+   * Đánh dấu chứ không xoá: đồng bộ Search Console nhập lại mọi truy vấn mỗi
+   * lần chạy, nên xoá xong lần sau nó quay lại.
+   */
+  @Column({ name: 'da_bo_qua', default: false })
+  daBoQua: boolean;
+
+  @Column({ name: 'ly_do_bo_qua', nullable: true })
+  lyDoBoQua: string | null;
+
   @Column({ name: 'ghi_chu', type: 'text', nullable: true })
   ghiChu: string | null;
 

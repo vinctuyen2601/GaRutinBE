@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Keyword } from './entities/keyword.entity';
@@ -19,6 +19,8 @@ export interface DongPhanTich extends KetQuaPhanTich {
   ctr: number | null;
   nguon: string;
   ghiChu: string | null;
+  daBoQua: boolean;
+  lyDoBoQua: string | null;
 }
 
 /**
@@ -61,9 +63,12 @@ export class TroLyService {
    * viết mới phải nổi lên đầu, vì đó là chỗ mất mát đang xảy ra. Trong cùng
    * nhóm thì từ khoá nhiều lượt hiển thị hơn đứng trước.
    */
-  async bangPhanTich(): Promise<DongPhanTich[]> {
+  /**
+   * @param gomBoQua true để xem lại những từ khoá đã bỏ qua (và khôi phục).
+   */
+  async bangPhanTich(gomBoQua = false): Promise<DongPhanTich[]> {
     const [kws, posts, doc] = await Promise.all([
-      this.kwRepo.find(),
+      this.kwRepo.find(gomBoQua ? {} : { where: { daBoQua: false } }),
       this.postRepo.find({
         select: ['id', 'slug', 'title'],
         // Bỏ bài đã gộp sang bài khác. Không lọc thì gộp xong bảng vẫn đếm
@@ -88,7 +93,8 @@ export class TroLyService {
         return {
           id: k.id, keyword: k.keyword,
           impressions: k.impressions, clicks: k.clicks, position: k.position,
-          ctr, nguon: k.nguon, ghiChu: k.ghiChu, ...kq,
+          ctr, nguon: k.nguon, ghiChu: k.ghiChu,
+          daBoQua: k.daBoQua, lyDoBoQua: k.lyDoBoQua, ...kq,
         };
       })
       .sort(
@@ -234,6 +240,34 @@ export class TroLyService {
 
   daCauHinhGsc(): boolean {
     return this.gsc.daCauHinh();
+  }
+
+  /**
+   * Bỏ qua hoặc nhận lại một từ khoá.
+   *
+   * Đồng bộ Search Console KHÔNG động tới cờ này — nó chỉ cập nhật lượt hiển
+   * thị, lượt nhấp và vị trí. Nhờ vậy quyết định "cái này không liên quan" của
+   * admin sống sót qua mọi lần đồng bộ, đúng mục đích của việc đánh dấu.
+   */
+  async doiBoQua(id: string, boQua: boolean, lyDo?: string) {
+    await this.kwRepo.update({ id }, {
+      daBoQua: boQua,
+      lyDoBoQua: boQua ? (lyDo?.trim() || null) : null,
+    });
+    return { ok: true };
+  }
+
+  /** Xoá hẳn — chỉ dùng cho từ khoá tự gõ, vì từ Search Console sẽ quay lại. */
+  async xoaTuKhoa(id: string) {
+    const kw = await this.kwRepo.findOne({ where: { id } });
+    if (!kw) return { ok: false };
+    if (kw.nguon === 'search-console') {
+      throw new BadRequestException(
+        'Từ khoá đến từ Search Console sẽ được nhập lại ở lần đồng bộ sau — hãy dùng "Bỏ qua" thay vì xoá.',
+      );
+    }
+    await this.kwRepo.delete({ id });
+    return { ok: true };
   }
 
   danhSachGoiY() {
