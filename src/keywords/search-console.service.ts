@@ -76,11 +76,49 @@ export class SearchConsoleService {
     });
     const data: any = await res.json();
     if (!res.ok) {
+      const loi = data.error_description || data.error || String(res.status);
       throw new BadRequestException(
-        `Không lấy được token Google: ${data.error_description || data.error || res.status}`,
+        `Không lấy được token Google: ${loi}${this.chanDoan(loi)}`,
       );
     }
     return data.access_token;
+  }
+
+  /**
+   * Mô tả tình trạng khoá để kèm vào thông báo lỗi.
+   *
+   * Có mặt vì "Invalid JWT Signature" không nói được gì về nguyên nhân: khoá
+   * cụt, khoá của service account khác, hay khoá đã bị xoá trên Google Cloud
+   * đều ra đúng một dòng chữ đó. Không có thông tin này thì phải SSH vào máy
+   * chủ chạy lệnh mới biết — mà lúc đang hỏng thì đó là rào cản thật.
+   *
+   * TUYỆT ĐỐI không in nội dung khoá, chỉ in các chỉ số về nó.
+   */
+  private chanDoan(loi: string): string {
+    if (!/signature|invalid_grant|JWT/i.test(loi)) return '';
+    const { email, key } = this.cauHinh;
+    const y: string[] = [];
+
+    let hopLe = false;
+    try {
+      crypto.createPrivateKey(key);
+      hopLe = true;
+    } catch {
+      /* để nguyên hopLe = false */
+    }
+
+    y.push(`khoá dài ${key.length} ký tự (bản đủ khoảng 1700)`);
+    y.push(`${key.split('\n').length} dòng (bản đủ khoảng 28)`);
+    y.push(hopLe ? 'định dạng hợp lệ' : 'ĐỊNH DẠNG HỎNG');
+    y.push(`email ${email}`);
+
+    const khuyen = !hopLe
+      ? 'Khoá sai định dạng — dán lại, nhớ bọc trong dấu nháy kép và giữ nguyên các \\n.'
+      : key.length < 1500
+        ? 'Khoá bị cắt cụt — nhiều khả năng thiếu dấu nháy kép nên shell cắt ở khoảng trắng.'
+        : 'Khoá đúng định dạng nhưng Google không nhận: nhiều khả năng khoá và email KHÔNG cùng một tệp JSON, hoặc khoá đã bị xoá trên Google Cloud. Lấy lại cả hai từ đúng một tệp.';
+
+    return `\n[chẩn đoán] ${y.join(' · ')}\n[nên làm] ${khuyen}`;
   }
 
   /**
