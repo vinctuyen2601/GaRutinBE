@@ -11,6 +11,26 @@ import {
 } from './dto/ai-product.dto';
 import { callLLM, parseJsonFromAI } from '../common/llm';
 
+/**
+ * Cắt chuỗi về đúng trần ký tự, cắt ở ranh giới TỪ.
+ *
+ * Giới hạn độ dài là thứ mô hình ngôn ngữ bỏ qua đều đặn: prompt ghi "tuyệt
+ * đối không quá 158 ký tự", chạy thử vẫn ra 182. Thêm chữ vào prompt để nài nỉ
+ * chỉ làm phần suy luận dài thêm — đúng thứ vừa làm hỏng cả lệnh. Trần độ dài
+ * là ràng buộc đo được nên ép bằng mã, dứt điểm.
+ *
+ * Cắt ở khoảng trắng cuối cùng chứ không cắt giữa từ: Google hiện nguyên văn
+ * chuỗi này, một từ đứt đôi trông như trang hỏng.
+ */
+function catVua(chuoi: string | undefined, tran: number): string {
+  const t = (chuoi ?? '').trim();
+  if (t.length <= tran) return t;
+  const cat = t.slice(0, tran);
+  const khoang = cat.lastIndexOf(' ');
+  // Không có khoảng trắng nào (một từ dài bất thường) thì đành cắt cứng.
+  return (khoang > tran * 0.6 ? cat.slice(0, khoang) : cat).replace(/[\s,;:.-]+$/, '');
+}
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -136,7 +156,12 @@ Trả về JSON:
       { maxTokens: 2000, temperature: 0.7, profile: 'quality', jsonMode: true },
     );
 
-    return parseJsonFromAI(text, 'products');
+    const kq = parseJsonFromAI<Record<string, unknown>>(text, 'products');
+    // Ép trần độ dài ngay tại đây, trước khi trả cho CMS: người quản trị nhìn
+    // ô đã điền sẵn và bấm lưu, hiếm khi đi đếm ký tự.
+    if (typeof kq.seoTitle === 'string') kq.seoTitle = catVua(kq.seoTitle, 60);
+    if (typeof kq.seoDescription === 'string') kq.seoDescription = catVua(kq.seoDescription, 158);
+    return kq as never;
   }
 
   async optimizeSeo(dto: OptimizeProductSeoDto): Promise<{
@@ -175,7 +200,12 @@ Trả về JSON:
       { maxTokens: 1500, temperature: 0.3, profile: 'quality', jsonMode: true },
     );
 
-    return parseJsonFromAI(text, 'products');
+    const kq = parseJsonFromAI<Record<string, unknown>>(text, 'products');
+    // Ép trần độ dài ngay tại đây, trước khi trả cho CMS: người quản trị nhìn
+    // ô đã điền sẵn và bấm lưu, hiếm khi đi đếm ký tự.
+    if (typeof kq.seoTitle === 'string') kq.seoTitle = catVua(kq.seoTitle, 60);
+    if (typeof kq.seoDescription === 'string') kq.seoDescription = catVua(kq.seoDescription, 158);
+    return kq as never;
   }
 
   async improveDescription(dto: ImproveProductDescriptionDto): Promise<{
@@ -205,6 +235,11 @@ Trả về JSON:
       { maxTokens: 2000, temperature: 0.5, profile: 'quality', jsonMode: true },
     );
 
-    return parseJsonFromAI(text, 'products');
+    const kq = parseJsonFromAI<Record<string, unknown>>(text, 'products');
+    // Ép trần độ dài ngay tại đây, trước khi trả cho CMS: người quản trị nhìn
+    // ô đã điền sẵn và bấm lưu, hiếm khi đi đếm ký tự.
+    if (typeof kq.seoTitle === 'string') kq.seoTitle = catVua(kq.seoTitle, 60);
+    if (typeof kq.seoDescription === 'string') kq.seoDescription = catVua(kq.seoDescription, 158);
+    return kq as never;
   }
 }
