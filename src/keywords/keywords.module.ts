@@ -8,6 +8,7 @@ import { TroLyService } from './tro-ly.service';
 import { KeywordsController } from './keywords.controller';
 import { TrackingModule } from '../tracking/tracking.module';
 import { SearchService } from '../posts/search.service';
+import { SearchConsoleService } from './search-console.service';
 
 @Module({
   // Post và TrackingModule ở đây vì trợ lý phải ghép từ khoá với bài viết và
@@ -16,7 +17,7 @@ import { SearchService } from '../posts/search.service';
     TypeOrmModule.forFeature([Keyword, KeywordSuggestion, Post]),
     TrackingModule,
   ],
-  providers: [KeywordsService, TroLyService, SearchService],
+  providers: [KeywordsService, TroLyService, SearchService, SearchConsoleService],
   controllers: [KeywordsController],
   exports: [KeywordsService],
 })

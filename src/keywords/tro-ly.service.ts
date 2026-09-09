@@ -6,6 +6,7 @@ import { KeywordSuggestion } from './entities/keyword-suggestion.entity';
 import { Post } from '../posts/entities/post.entity';
 import { TrackingService } from '../tracking/tracking.service';
 import { SearchService } from '../posts/search.service';
+import { SearchConsoleService } from './search-console.service';
 import { timBaiKhop, ketLuan, quaChung, type KetQuaPhanTich } from './phan-tich';
 
 export interface DongPhanTich extends KetQuaPhanTich {
@@ -37,6 +38,7 @@ export class TroLyService {
     private readonly postRepo: Repository<Post>,
     private readonly tracking: TrackingService,
     private readonly search: SearchService,
+    private readonly gsc: SearchConsoleService,
   ) {}
 
   /** Số người đọc từng bài, tra theo slug. */
@@ -140,6 +142,17 @@ export class TroLyService {
       }
     }
     return { them, cauHoi: cauHoi.length, lienQuan: lienQuan.length };
+  }
+
+  /** Kéo số liệu thẳng từ Search Console, khỏi phải dán tay. */
+  async dongBoSearchConsole(soNgay = 90) {
+    const rows = await this.gsc.layTruyVan(soNgay);
+    const kq = await this.nhapSearchConsole(rows);
+    return { ...kq, soNgay };
+  }
+
+  daCauHinhGsc(): boolean {
+    return this.gsc.daCauHinh();
   }
 
   danhSachGoiY() {

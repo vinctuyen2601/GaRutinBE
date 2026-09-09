@@ -61,6 +61,18 @@ export class KeywordsController {
     return this.troLy.nhapSearchConsole(body?.rows ?? []);
   }
 
+  /** Kéo số liệu thẳng từ Search Console bằng service account. */
+  @Post('dong-bo-search-console')
+  dongBoSearchConsole(@Body() body: { soNgay?: number }) {
+    return this.troLy.dongBoSearchConsole(body?.soNgay ?? 90);
+  }
+
+  /** Cho CMS biết có nên hiện nút đồng bộ không. */
+  @Get('gsc-san-sang')
+  gscSanSang() {
+    return { sanSang: this.troLy.daCauHinhGsc() };
+  }
+
   @Get('goi-y')
   danhSachGoiY() {
     return this.troLy.danhSachGoiY();

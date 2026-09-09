@@ -36,6 +36,23 @@ function chuanHoa(s: string): string {
     .toLowerCase();
 }
 
+/**
+ * Hai tiêu đề có nói cùng một chuyện không.
+ *
+ * Đo theo Jaccard trên từ có nghĩa: chung / tổng. Ngưỡng 0.5 tức quá nửa số từ
+ * là chung — đủ chặt để "Hướng Dẫn Làm Chuồng Nuôi Gà Rutin" và "Chuồng Nuôi Gà
+ * Rutin, Cách Chọn Tự Làm" bị coi là trùng, nhưng không kéo theo những bài chỉ
+ * tình cờ có chung một hai từ.
+ */
+function giongNhau(a: string, b: string): boolean {
+  const ta = new Set(tachTu(a));
+  const tb = new Set(tachTu(b));
+  if (ta.size === 0 || tb.size === 0) return false;
+  let chung = 0;
+  for (const t of ta) if (tb.has(t)) chung++;
+  return chung / (ta.size + tb.size - chung) >= 0.5;
+}
+
 /** Kiểm từ khoá có quá chung không — tức không còn từ nào mang thông tin. */
 export function quaChung(tuKhoa: string): boolean {
   return tachTu(tuKhoa).length === 0;
@@ -154,7 +171,13 @@ export function ketLuan(
   const nhap = kw.clicks ?? 0;
   const viTri = kw.position ? Number(kw.position) : null;
 
-  if (bai.length > 1) {
+  // "Trùng" phải là HAI BÀI GIỐNG NHAU, không phải hai bài cùng khớp từ khoá.
+  //
+  // Phân biệt này quyết định: với 94 bài cùng nói về gà rutin, hầu như từ khoá
+  // nào cũng khớp từ hai bài trở lên — báo "gộp bài" cho tất cả thì ra 16 dòng
+  // giống hệt nhau và vô dụng. Còn "Máy Ấp Trứng" với "Trứng Gà Rutin Chế Biến"
+  // cùng khớp từ khoá về trứng nhưng là hai bài khác nhau, không gộp được.
+  if (bai.length > 1 && giongNhau(bai[0].title, bai[1].title)) {
     const tong = bai.reduce((s, b) => s + b.nguoiDoc, 0);
     return {
       viec: 'gop-bai',
@@ -172,6 +195,10 @@ export function ketLuan(
       baiKhop: bai,
     };
   }
+
+  // Không phải trùng thì chỉ xét bài khớp nhất — nhiều bài cùng chủ đề rộng là
+  // chuyện bình thường, không phải vấn đề cần sửa.
+  const chinh = bai.slice(0, 1);
 
   if (bai.length === 0) {
     return hienThi > 0
