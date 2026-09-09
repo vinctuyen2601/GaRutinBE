@@ -8,7 +8,7 @@ import { TrackingService } from '../tracking/tracking.service';
 import { SearchService } from '../posts/search.service';
 import { SearchConsoleService } from './search-console.service';
 import { GoiYService } from './goi-y.service';
-import { timBaiKhop, ketLuan, quaChung, type KetQuaPhanTich } from './phan-tich';
+import { timBaiKhop, timBaiNhacToi, ketLuan, quaChung, type KetQuaPhanTich } from './phan-tich';
 
 export interface DongPhanTich extends KetQuaPhanTich {
   id: string;
@@ -70,25 +70,33 @@ export class TroLyService {
     const [kws, posts, doc] = await Promise.all([
       this.kwRepo.find(gomBoQua ? {} : { where: { daBoQua: false } }),
       this.postRepo.find({
-        select: ['id', 'slug', 'title'],
+        // Lấy cả `content`: bộ ghép theo tiêu đề bỏ sót phần lớn trường hợp —
+        // đo thật thì 24/31 từ khoá bị khuyên "viết mới" đã có nội dung nằm sẵn
+        // trong thân một bài. Payload lớn nhưng đây là trang quản trị, và một
+        // truy vấn nặng đổi lấy lời khuyên đúng là đánh đổi dễ chịu.
+        select: ['id', 'slug', 'title', 'content'],
         // Bỏ bài đã gộp sang bài khác. Không lọc thì gộp xong bảng vẫn đếm
         // chúng và vẫn báo "gộp bài" — việc đã làm xong mà nút vẫn còn đó,
-        // người dùng bấm lại rồi tưởng hỏng. Bài chuyển hướng cũng không còn
-        // nội dung riêng nên không thể "nhắm" vào từ khoá nào nữa.
+        // người dùng bấm lại rồi tưởng hỏng.
         where: { redirectTo: IsNull() },
       }),
       this.nguoiDocTheoSlug(),
     ]);
 
     const UU_TIEN: Record<string, number> = {
-      'gop-bai': 0, 'viet-moi': 1, 'sua-tieu-de': 2,
-      'chua-du-lieu': 3, 'da-tot': 4, 'bo-qua': 5,
+      // Bổ sung xếp trên viết mới: sửa một bài đã có rẻ hơn và ít rủi ro hơn
+      // đẻ thêm bài, mà blog đang có 37 bài chưa ai đọc.
+      'gop-bai': 0, 'bo-sung': 1, 'viet-moi': 2, 'sua-tieu-de': 3,
+      'chua-du-lieu': 4, 'da-tot': 5, 'bo-qua': 6,
     };
 
     return kws
       .map((k) => {
         const bai = timBaiKhop(k.keyword, posts, doc);
-        const kq = ketLuan(k, bai, quaChung(k.keyword));
+        // Chỉ tìm trong thân bài khi tiêu đề không khớp — tránh quét nội dung
+        // 94 bài cho những từ khoá vốn đã có bài nhắm vào.
+        const nhacToi = bai.length === 0 ? timBaiNhacToi(k.keyword, posts, doc) : [];
+        const kq = ketLuan(k, bai, quaChung(k.keyword), nhacToi);
         const ctr = k.impressions ? (k.clicks ?? 0) / k.impressions : null;
         return {
           id: k.id, keyword: k.keyword,

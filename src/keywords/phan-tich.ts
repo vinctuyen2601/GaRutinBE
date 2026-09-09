@@ -8,6 +8,7 @@
  */
 
 export type ViecNenLam =
+  | 'bo-sung'
   | 'viet-moi'
   | 'sua-tieu-de'
   | 'gop-bai'
@@ -27,6 +28,46 @@ export interface KetQuaPhanTich {
   viec: ViecNenLam;
   lyDo: string;
   baiKhop: BaiKhop[];
+}
+
+/**
+ * Tìm bài đã NHẮC TỚI từ khoá trong thân bài, dù tiêu đề không nhắm vào.
+ *
+ * Đây là chỗ bộ ghép theo tiêu đề bỏ sót nhiều nhất. Đo trên dữ liệu thật: 31
+ * từ khoá bị khuyên "viết mới", thì 24 cái nội dung đã nằm sẵn trong thân một
+ * bài — chỉ thiếu ở tiêu đề. Khuyên viết bài mới cho chúng là đẩy shop vào
+ * đúng cái bẫy đã tạo ra 37 bài chưa ai đọc.
+ *
+ * So khớp theo TẬP TỪ, không phải chuỗi con. Dùng `indexOf` thì "gô" khớp vào
+ * giữa "gôm", "tin" khớp vào "tính" — và mọi từ khoá đều báo là đã có, kể cả
+ * "gà gô cánh đốm" khớp vào một bài về mài mỏ. Đã đo và thấy thật.
+ */
+export function timBaiNhacToi(
+  tuKhoa: string,
+  baiViet: { id: string; slug: string; title: string; content?: string | null }[],
+  nguoiDoc: Record<string, number>,
+): BaiKhop[] {
+  const tk = tachTu(tuKhoa);
+  if (tk.length === 0) return [];
+
+  return baiViet
+    .map((b) => {
+      const tap = new Set(
+        tachTu(`${b.title} ${(b.content ?? '').replace(/<[^>]+>/g, ' ')}`),
+      );
+      const phu = tk.filter((t) => tap.has(t)).length / tk.length;
+      return { b, phu };
+    })
+    // Đòi phủ TOÀN BỘ từ khoá: phủ một phần thì không đủ căn cứ nói "bài này đã
+    // nói về chuyện đó", và khuyên bổ sung nhầm bài còn tệ hơn khuyên viết mới.
+    .filter((x) => x.phu >= 0.999)
+    .sort((a, b) => (nguoiDoc[b.b.slug] ?? 0) - (nguoiDoc[a.b.slug] ?? 0))
+    .map((x) => ({
+      id: x.b.id,
+      slug: x.b.slug,
+      title: x.b.title,
+      nguoiDoc: nguoiDoc[x.b.slug] ?? 0,
+    }));
 }
 
 /** Bỏ dấu và hạ chữ thường để so khớp — dữ liệu thật viết lẫn lộn hai kiểu. */
@@ -157,6 +198,8 @@ export function ketLuan(
   kw: { impressions: number | null; clicks: number | null; position: string | null },
   bai: BaiKhop[],
   quaChung = false,
+  /** Bài đã nhắc tới từ khoá trong thân, dù tiêu đề không nhắm vào. */
+  baiNhacToi: BaiKhop[] = [],
 ): KetQuaPhanTich {
   // Từ khoá chung chung như "gà rutin" không ghép được với bài nào cụ thể, và
   // cũng không nên khuyên viết bài mới — cả website đã nói về nó rồi. Việc cần
@@ -204,10 +247,22 @@ export function ketLuan(
   const chinh = bai.slice(0, 1);
 
   if (bai.length === 0) {
+    // Chưa có bài nào NHẮM vào, nhưng đã có bài NHẮC TỚI → bổ sung, đừng viết mới.
+    if (hienThi > 0 && baiNhacToi.length > 0) {
+      const b = baiNhacToi[0];
+      return {
+        viec: 'bo-sung',
+        lyDo:
+          `${hienThi} lượt hiển thị. Nội dung đã có sẵn trong bài "${b.title}" ` +
+          `(${b.nguoiDoc} người đọc) nhưng tiêu đề chưa nhắm vào từ khoá này. ` +
+          'Bổ sung một mục và đưa cụm từ vào tiêu đề hoặc H2 — rẻ hơn và ít rủi ro hơn viết bài mới.',
+        baiKhop: baiNhacToi.slice(0, 3),
+      };
+    }
     return hienThi > 0
       ? {
           viec: 'viet-moi',
-          lyDo: `${hienThi} lượt hiển thị mà chưa có bài nào nhắm vào — nhu cầu đang bỏ không.`,
+          lyDo: `${hienThi} lượt hiển thị, và chưa bài nào nhắc tới từ khoá này — nhu cầu đang bỏ không.`,
           baiKhop: [],
         }
       : {
