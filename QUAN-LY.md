@@ -217,4 +217,63 @@ Chưa thống nhất với chủ shop — đây là đề xuất.
 
 ---
 
+## 11. Hiểu biết tích luỹ
+
+*Chỉ thêm, không xoá. Sai thì viết đính chính bên dưới, giữ nguyên dòng cũ.*
+
+### 09/09/2026 · Đọc mã rồi kết luận mà không đo dữ liệu là đoán, không phải chẩn đoán
+**Điều đã biết:** Khi phễu hiện "thêm giỏ 1 · tỉ lệ 0", tôi đọc SQL rồi kết
+luận mẫu số bị thổi phồng bởi lượt xem cũ từ trước khi bật đo. Kéo dữ liệu thật
+về thì ngược hẳn: mẫu số bị **thiếu**, vì khách thêm giỏ từ trang danh sách mà
+không mở trang chi tiết.
+**Biết bằng cách:** đối chiếu bảng theo trang với bảng phễu cùng một ngày — hai
+sản phẩm có người thêm giỏ đều không nằm trong danh sách trang được xem.
+**Hệ quả về sau:** với tài sản này, mã cho biết *ý nghĩa*, chỉ dữ liệu mới cho
+biết *sự thật*. Luôn kéo số trước khi kết luận.
+
+### 09/09/2026 · Phép đo của chính mình cũng có thể sai
+**Điều đã biết:** Báo "chưa deploy" ba lần liền, trong khi bản mới đã lên từ
+lâu. Biểu thức lọc đường dẫn chunk không nhận dấu ngoặc vuông nên chưa bao giờ
+tải đúng tệp cần kiểm.
+**Hệ quả về sau:** khi kết quả đo mâu thuẫn với điều hợp lý, nghi công cụ đo
+trước khi nghi hệ thống.
+
+### 09/09/2026 · Ràng buộc đo được thì ép bằng mã, đừng nài nỉ trong prompt
+**Điều đã biết:** Prompt ghi "TUYỆT ĐỐI không quá 158 ký tự"; chạy thật ba lần
+ra 160, 182, 161. Thêm chữ nài nỉ chỉ làm phần suy luận dài ra và gây hỏng
+khác.
+**Hệ quả về sau:** độ dài, định dạng, danh sách cho phép — ép bằng mã. Prompt
+chỉ lo phần không đo được.
+
+### 09/09/2026 · Nhà cung cấp LLM khác nhau hành xử khác nhau, và im lặng
+**Điều đã biết:** Cùng một lệnh lúc chạy lúc trả 500. Nguyên nhân: một nhà phớt
+lờ `response_format` và trả văn xuôi; `callLLM` coi đó là thành công nên ba nhà
+còn lại không bao giờ được thử.
+**Hệ quả về sau:** mọi phép kiểm chất lượng phải nằm **trong** vòng dự phòng,
+không nằm ở nơi gọi. Lỗi phụ thuộc nhà cung cấp trông y hệt lỗi ngẫu nhiên.
+
+### 10/09/2026 · Một con số tổng có thể che giấu điều ngược lại
+**Điều đã biết:** "10 đơn trong toàn bộ lịch sử" nghe như shop đứng yên. Mở
+từng đơn ra: 3 cái là rác/test, còn 7 đơn thật, và **ba đơn tháng 9 đều xác
+nhận** — xu hướng đang tốt lên.
+**Biết bằng cách:** liệt kê từng đơn kèm tên khách, ngày, trạng thái.
+**Hệ quả về sau:** với dữ liệu ít, đừng bao giờ dùng số tổng. Mở hết ra mà đọc
+— chỉ có mười dòng.
+
+### 10/09/2026 · Chỗ nguy hiểm nhất là chỗ chưa ai nhìn
+**Điều đã biết:** Cả ngày sửa mẫu số của một phân số, trong khi không ai kiểm
+xem cơ sở dữ liệu có được sao lưu không. Hoá ra không tìm thấy cơ chế nào.
+**Hệ quả về sau:** chạy giai đoạn "mất gì thì không lấy lại được" **trước**
+mọi việc tối ưu. Việc tối ưu luôn hấp dẫn hơn và luôn được làm trước nếu không
+có kỷ luật.
+
+### 10/09/2026 · Về cách chủ shop làm việc
+**Điều đã biết:** Thích nói thẳng, kéo lại ngay khi tôi lan man sang kiến trúc
+thay vì trả lời câu được hỏi. Ưu tiên đã nêu rõ: **sản phẩm + review > bài viết
+SEO > vận hành**. Không muốn nghe hứa hẹn doanh thu.
+**Hệ quả về sau:** trả lời đúng câu được hỏi trước, đề xuất mở rộng sau và phải
+ngắn.
+
+---
+
 *Hồ sơ này do người quản lý lập và tự cập nhật. Sửa số thì sửa kèm ngày đo.*
