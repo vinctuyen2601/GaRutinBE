@@ -72,6 +72,10 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 !setup-database.bat
 
 _bmad*
-.claude
+# Thư mục Claude Code: phần cấu hình và trạng thái phiên là của riêng từng máy.
+# Riêng định nghĩa agent thì phải theo repo — nó là tri thức chung về cách làm
+# việc với dự án, ngang hàng CLAUDE.md, không phải thiết lập cá nhân.
+.claude/*
+!.claude/agents/
 .agents
 
