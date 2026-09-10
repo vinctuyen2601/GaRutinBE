@@ -29,6 +29,79 @@ API sau CloudFront.
 
 ---
 
+## 1b. Hiểu biết nghề — gà rutin và cách bán nó
+
+*Học từ chính blog của shop (74 bài), chủ yếu bài "50 Câu Hỏi Thường Gặp" và
+"Bảng Giá Gà Rutin 2026". Người quản lý chưa đọc hai bài này thì chưa đủ tư
+cách nhận định về sản phẩm.*
+
+### Con vật
+
+Lai giữa **gà gô cánh đốm** và **chim cút ngực xanh**, gốc Đông Nam Á. Tên
+"rutin" đến từ chất chống oxy hoá rutin có nhiều trong trứng.
+
+```
+trưởng thành   50–70 gram · cao 7–10 cm — một trong những giống nhỏ nhất thế giới
+tuổi thọ       3–5 năm (tốt có thể 6–7)
+màu lông       trên 20 màu. Phổ biến: nâu vàng (tự nhiên), trắng tuyết,
+               đen hắc hê, vảy cá, vàng bông, xám bạc, lông xù (frizzle)
+tính nết       nhận ra chủ sau 2–3 tuần, chạy lại khi nghe tiếng lắc hộp thức ăn
+dị ứng         ít hơn hẳn chó mèo — ít rụng lông, ít bụi
+chi phí nuôi   80.000–140.000đ/tháng cho 4–6 con
+```
+
+### Thuật ngữ phải biết
+
+- **Bao đẻ** — cam kết gà mái sẽ đẻ. Đây là cam kết đặc thù của nghề và là thứ
+  khách mua mái quan tâm nhất. Không biết từ này thì đọc mô tả không hiểu.
+- **Hắc hê**, **vảy cá**, **bò sữa**, **vàng kem**, **lông xù (frizzle)** — tên
+  màu lông, không phải tên giống.
+
+### Giá phụ thuộc cái gì — theo chính bài viết của shop
+
+> *"Các yếu tố ảnh hưởng đến giá gồm **độ tuổi**, **giới tính**, **màu lông**,
+> nguồn gốc và chất lượng giống."*
+
+### Khách lo gì trước khi mua — theo chính bài viết của shop
+
+> *"Chọn gà từ trại uy tín, **đã tiêm vaccine**, có **cam kết bao đẻ**."*
+
+Cộng thêm mối lo riêng của hàng sống: gà có sống nổi khi ship đi tỉnh không, và
+chết dọc đường thì ai chịu.
+
+### ⚠ Mâu thuẫn giữa nội dung và gian hàng
+
+Đối chiếu năm tiêu chí trên với cả 20 mô tả sản phẩm (đo 10/09/2026):
+
+| Khách được dạy phải hỏi | Sản phẩm có trả lời |
+|---|---|
+| Độ tuổi — yếu tố giá số 1 | **0/20** |
+| Đã tiêm vaccine | **0/20** |
+| Cách vận chuyển gà sống | **0/20** |
+| Cam kết bao đẻ | 5/20 |
+| Màu lông | 18/20 |
+
+**Shop tự dạy khách phải hỏi tuổi và vaccine, rồi không ghi cả hai lên bất kỳ
+sản phẩm nào.** Đây là việc đáng làm nhất của gian hàng — đáng hơn "viết mô tả
+dài hơn", vì nó vá đúng chỗ khách đang phải nhắn Zalo để hỏi.
+
+### ⚠ Giá không phản ánh độ hiếm
+
+```
+Trống hắc he 7 màu (Hiếm)      70.000đ   ← ghi là hiếm
+Trắng / Trống xám / Mái xám …  70.000đ   ← chín màu thường, cùng giá
+Mái vàng                      100.000đ
+```
+
+Bài viết nói màu lông ảnh hưởng giá, nhưng một con ghi "Hiếm" lại bằng giá màu
+thường, còn màu thường lại đắt hơn. **Hoặc nhãn "Hiếm" vô nghĩa, hoặc đang bán
+hớ.** Chỉ chủ shop trả lời được — xem mục 8.
+
+Hai sản phẩm **"Mái vàng" trùng cả tên lẫn giá 100.000đ** — gần như chắc chắn
+là bản ghi lặp.
+
+---
+
 ## 2. Quy mô thật — đo ngày 10/09/2026
 
 ```
@@ -183,7 +256,9 @@ xem có ai tìm chúng không.
 | Xác minh sao lưu CSDL — **gấp nhất** | chủ shop kiểm AWS |
 | `mua-ga-rutin-ha-noi-uy-tin`: giữ hay gộp? (shop có ship Hà Nội không?) | chủ shop quyết — **đừng tự gộp** |
 | Gộp 17 bài quận huyện về `mua-ga-rutin-tp-hcm` | chủ shop chạy |
-| Dọn 2 sản phẩm trùng tên "Mái vàng" | chủ shop quyết giữ cái nào |
+| Dọn 2 sản phẩm trùng tên "Mái vàng" (trùng cả giá 100.000đ) | chủ shop quyết giữ cái nào |
+| **"Trống hắc he 7 màu (Hiếm)" bán 70.000đ bằng màu thường** — nhãn hiếm vô nghĩa hay bán hớ? | chủ shop quyết |
+| Bổ sung **tuổi** và **đã tiêm vaccine** vào cả 20 mô tả | chủ shop cấp thông tin, tôi soạn |
 | Xoá 3 đơn test khỏi dữ liệu | chủ shop quyết |
 | 17fishing chưa nối Search Console | |
 | Mã chết: `crawl-to-drafts` (không có lối vào), trang `/keywords-cu` | |
