@@ -326,7 +326,15 @@ export class TrackingService {
                 COUNT(DISTINCT CASE WHEN v.event = 'view' THEN v.visitor_id END) AS viewers,
                 COUNT(*) FILTER (WHERE v.event = 'add_to_cart') AS cart_events,
                 COUNT(DISTINCT CASE WHEN v.event = 'add_to_cart' THEN v.visitor_id END) AS carters,
-                COUNT(DISTINCT CASE WHEN v.event = 'begin_checkout' THEN v.visitor_id END) AS checkouters
+                COUNT(DISTINCT CASE WHEN v.event = 'begin_checkout' THEN v.visitor_id END) AS checkouters,
+                -- Số khách CHẠM TỚI sản phẩm, gộp mọi kiểu tương tác.
+                --
+                -- Cần cái này làm mẫu số cho các tỉ lệ, không dùng được cột
+                -- "khách xem": nút thêm giỏ nằm ngay trên thẻ sản phẩm ở trang
+                -- danh sách, nên khách thêm giỏ được mà chưa từng mở trang chi
+                -- tiết. Chia cho "khách xem" thì tỉ lệ vượt 100% (đã thấy 300%:
+                -- 1 người xem, 3 người thêm giỏ) hoặc chia cho 0.
+                COUNT(DISTINCT v.visitor_id) AS reachers
            FROM page_visits v
           WHERE ${vConds.join(' AND ')}
           GROUP BY 1
@@ -354,6 +362,7 @@ export class TrackingService {
               COALESCE(t.cart_events, 0)   AS cart_events,
               COALESCE(t.carters, 0)       AS carters,
               COALESCE(t.checkouters, 0)   AS checkouters,
+              COALESCE(t.reachers, 0)      AS reachers,
               COALESCE(s.quantity_sold, 0) AS quantity_sold,
               COALESCE(s.orders, 0)        AS orders,
               COALESCE(s.buyers, 0)        AS buyers,
@@ -385,6 +394,7 @@ export class TrackingService {
       cartEvents: Number(r.cart_events),
       carters: Number(r.carters),
       checkouters: Number(r.checkouters),
+      reachers: Number(r.reachers),
       quantitySold: Number(r.quantity_sold),
       orders: Number(r.orders),
       buyers: Number(r.buyers),
