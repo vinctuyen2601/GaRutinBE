@@ -36,7 +36,29 @@ export class R2Service {
     let finalContentType = contentType;
 
     if (contentType.startsWith('image/') && contentType !== 'image/gif') {
-      finalBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+      finalBuffer = await sharp(buffer)
+        /**
+         * rotate() không tham số: xoay theo thẻ EXIF của máy ảnh rồi bỏ thẻ đi.
+         * Thiếu bước này thì ảnh dọc chụp bằng điện thoại lên web nằm ngang,
+         * vì sharp xoá metadata lúc chuyển định dạng còn pixel thì giữ nguyên
+         * chiều cũ.
+         */
+        .rotate()
+        /**
+         * Chặn cạnh dài ở 1600px. Web không dùng bộ tối ưu ảnh của Next (xem
+         * next.config bên GaRutinWeb: hạn mức Vercel cạn là ảnh vỡ sạch), nên
+         * tệp tải lên chính là tệp khách tải về — không có ai thu nhỏ giúp.
+         *
+         * Ảnh hiện tại nhẹ vì được nén tay trước khi tải lên. Khi chụp hàng
+         * loạt bằng điện thoại thì không còn khâu đó: một tấm 4000px qua webp
+         * q85 vẫn ~800KB, gấp năm lần mức đang chạy.
+         *
+         * withoutEnlargement: ảnh gốc nhỏ hơn 1600 thì giữ nguyên, phóng to
+         * chỉ làm nặng thêm mà không rõ hơn.
+         */
+        .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toBuffer();
       finalContentType = 'image/webp';
       finalKey = key.replace(/\.[^.]+$/, '.webp');
     }
