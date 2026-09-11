@@ -138,6 +138,8 @@ trong lúc render để bộ đo bỏ qua.
 - `mua-ga-rutin-ha-noi-uy-tin` — chủ shop chưa quyết giữ hay gộp (có ship Hà
   Nội không?). **Đừng tự gộp.**
 - Chủ shop chưa chạy gộp hàng loạt 17 bài quận huyện về `mua-ga-rutin-tp-hcm`.
+- **Cân nặng gà (30–70g hay 50–70g): chủ shop đã quyết BỎ QUA.** Site đang
+  khai hai kiểu ở vài bài. Đừng nêu lại — đã hỏi và đã bị gạt.
 - Mã chết: endpoint `crawl-to-drafts` không có lối vào ở giao diện; trang
   `/keywords-cu` cũ.
 
