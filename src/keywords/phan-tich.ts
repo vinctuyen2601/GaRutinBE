@@ -95,10 +95,28 @@ export function timBaiNhacToi(
 }
 
 /** Bỏ dấu và hạ chữ thường để so khớp — dữ liệu thật viết lẫn lộn hai kiểu. */
+/**
+ * Cặp từ chỉ khác nhau ở dấu nhưng khác hẳn nghĩa. Bỏ dấu làm chúng chập lại,
+ * và mọi từ khoá về LỒNG NUÔI khớp nhầm vào bài về LÔNG VŨ. Đã dính ba lần —
+ * lần gần nhất "lồng gà rutin" (26 lượt hiển thị, ý định mua) bị gán cho bài
+ * "Gà Rutin Lông Xù", một bài không chứa chữ "lồng" nào.
+ *
+ * Ghim thành mã riêng TRƯỚC khi bỏ dấu. Không khớp được bài nào là kết quả
+ * ĐÚNG và hữu ích hơn khớp nhầm bài: nó nói thật rằng chưa có bài phục vụ.
+ */
+const CHONG_CHAP: [RegExp, string][] = [
+  [/lồng/gi, ' longnuoi '],
+  [/lông/gi, ' longvu '],
+  [/chuồng/gi, ' chuongnuoi '],
+  [/chuông/gi, ' chuongkeu '],
+];
+
 function chuanHoa(s: string): string {
-  return s
+  let t = s;
+  for (const [re, ma] of CHONG_CHAP) t = t.replace(re, ma);
+  return t
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/gi, 'd')
     .toLowerCase();
 }
