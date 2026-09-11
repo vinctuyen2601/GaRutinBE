@@ -95,6 +95,32 @@ tạo link quảng cáo bắt buộc điền campaign, nên có source mà trố
 chắc chắn không phải link của shop. ChatGPT tự thêm `utm_source=chatgpt.com`
 vào link nó đưa người dùng; nhóm riêng **"trợ lý AI"** sinh ra vì chuyện đó.
 
+### Bảng từ khoá đã TỰ kết luận việc cần làm — đừng suy lại bằng tay
+
+`GET /admin/keywords/phan-tich` trả về mỗi từ khoá kèm hai trường quyết định:
+`viec` và `lyDo`. Đó là kết luận đã cân nhắc, không phải dữ liệu thô.
+
+Đã trả giá một lần vì bỏ qua chúng: script phân tích chỉ đọc `impressions` và
+`baiKhop`, thấy `baiKhop` rỗng liền kết luận "chưa có bài, nên viết mới" cho
+`gà rutin là gì` — trong khi `lyDo` của chính bản ghi đó ghi rõ *"Từ khoá quá
+chung, cả website đang nhắm vào nó... việc cần làm là tiêu đề và mô tả của
+TRANG CHỦ"*. Suýt đẻ thêm một bài tranh hạng với bài mạnh nhất blog.
+
+**`baiKhop` rỗng KHÔNG có nghĩa là chưa có bài.** `timBaiKhop` chỉ đọc `title`,
+đòi phủ >=75% số từ của từ khoá. Bài có `seoTitle` nhắm đúng từ khoá vẫn bị
+loại nếu tiêu đề hiển thị không chứa đủ từ. Phân biệt "không ghép được với bài
+nào" với "chưa có bài" — chú thích trong `phan-tich.ts` đã cảnh báo đúng điều
+này.
+
+Phân bố thật (11/09/2026) cho thấy vì sao viết thêm bài hiếm khi là việc đúng:
+
+```
+sua-tieu-de     51 từ · 2.374 hiển thị   <- 63% nhu cầu nằm ở đây
+bo-sung         80 từ ·   553 hiển thị
+da-tot          11 từ ·   685 hiển thị
+viet-moi        48 từ ·   130 hiển thị   <- 3% nhu cầu
+```
+
 ### Trang 404 không được tính là lượt xem
 
 `TrackVisit` nằm ở layout gốc nên chạy cho mọi trang. Có ngày `/blog:` — đường
