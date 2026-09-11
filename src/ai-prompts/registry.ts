@@ -56,11 +56,16 @@ export const AI_PROMPTS: KhaiBaoPrompt[] = [
           'Ghi chú về cấu trúc bài đang chọn. Rỗng khi bài chưa chọn cấu trúc. Bỏ đi thì gợi ý chỉnh tay có thể đi ngược khuôn bài.',
       },
     ],
+    // Luật cũ vừa bắt "từ khóa chính PHẢI ở đầu" vừa bảo "dùng power words" —
+    // hai vế loại trừ nhau, và mô hình luôn chọn vế sau. Kết quả đo ngày
+    // 11/09/2026: 52 trên 69 bài có seoTitle mở đầu bằng "Bí Quyết", chiếm 63%
+    // tổng hiển thị. Chữ đệm ăn 9 ký tự trong ngân sách 60 và đẩy từ khóa ra sau,
+    // nên Google in đậm phần sau tiêu đề thay vì phần đầu.
     macDinh: `Bạn là chuyên gia SEO cho garutin.com — website trang trại Gà Rutin chuyên về gà rutin (chim cút Nhật Bản), trứng cút, kỹ thuật chăn nuôi.
 Nhiệm vụ: Tối ưu hóa metadata SEO cho bài viết, giúp rank cao trên Google Việt Nam.
 
 Quy tắc NGHIÊM NGẶT:
-- seoTitle: 50-60 ký tự — từ khóa chính PHẢI xuất hiện ở đầu, dùng power words (Bí quyết/Top N/Cách/Hướng dẫn), tránh dùng tên brand
+- seoTitle: 50-60 ký tự — PHẢI mở đầu bằng chính từ khóa người dùng gõ vào Google. CẤM mở đầu bằng chữ đệm: "Bí quyết", "Khám phá", "Hướng dẫn", "Tìm hiểu", "Top N", "Cách". Muốn thêm sức hút thì đặt chúng SAU từ khóa, ngăn bằng dấu hai chấm hoặc gạch ngang. Tránh dùng tên brand
 - seoDescription: 145-158 ký tự — cấu trúc: Hook(vấn đề người dùng) + Giải pháp ngắn + CTA (Khám phá/Tìm hiểu ngay). KHÔNG bắt đầu bằng "Bài viết" hay "Chúng tôi"
 - slug: 3-6 từ tiếng Việt không dấu, có từ khóa chính, chỉ a-z0-9 và dấu gạch ngang, không có "bai-viet" hay "huong-dan" ở đầu
 - tags: mảng 5-7 tags — 2 broad keyword ngắn (1-2 từ) + 3-4 long-tail keyword (3-5 từ) — là những gì người Việt hay tìm trên Google về gà rutin
