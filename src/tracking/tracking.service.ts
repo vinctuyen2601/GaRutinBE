@@ -181,6 +181,17 @@ export class TrackingService {
                        -- cũ đã lỡ lưu admin.<tên miền> vẫn nằm đó, sửa tầng
                        -- ghi không làm chúng biến mất.
                        ${REF_SACH},
+                       -- Trước khi kết luận "trực tiếp", đọc User-Agent.
+                       -- Trình duyệt trong ứng dụng Zalo KHÔNG gửi referrer,
+                       -- nên khách bấm link mình gửi qua Zalo đều rơi vào nhóm
+                       -- trực tiếp. User-Agent thì không mất vì nó ở header
+                       -- HTTP — tách được cả dữ liệu cũ, không cần thu lại.
+                       CASE
+                         WHEN v.user_agent ~* '\\mZalo\\M'                           THEN 'zalo (trong app)'
+                         WHEN v.user_agent ~* '(FBAN|FBAV|FB_IAB|FBIOS)'             THEN 'facebook (trong app)'
+                         WHEN v.user_agent ~* '\\mInstagram\\M'                      THEN 'instagram (trong app)'
+                         WHEN v.user_agent ~* '(BytedanceWebview|musical_ly|TikTok)'  THEN 'tiktok (trong app)'
+                       END,
                        'trực tiếp')                       AS source,
               COALESCE(NULLIF(v.utm_campaign, ''), '—')   AS campaign,
               CASE

@@ -52,3 +52,33 @@ export function deviceFromUserAgent(ua?: string | null): Device | null {
   if (MOBILE_RE.test(ua)) return 'mobile';
   return 'desktop';
 }
+
+/**
+ * Nhận ra trình duyệt nằm TRONG một ứng dụng nhắn tin / mạng xã hội.
+ *
+ * VÌ SAO QUAN TRỌNG VỚI SHOP NÀY: đơn hàng thật chốt qua Zalo và điện thoại. Nhưng trình
+ * duyệt trong ứng dụng Zalo **không gửi referrer** khi mở link, nên mọi lượt
+ * khách bấm link mình gửi trong Zalo đều rơi vào nhóm "trực tiếp". Nhìn bảng
+ * nguồn thì tưởng khách tự gõ tên miền vào, thực ra là khách từ Zalo.
+ *
+ * Cùng lý do với Facebook: bấm link trong ứng dụng Facebook hoặc Messenger
+ * cũng thường mất referrer, nên con số facebook trong bảng luôn thấp hơn thật.
+ *
+ * User-Agent thì KHÔNG mất — nó nằm ở header HTTP chứ không phụ thuộc chính
+ * sách referrer. Nên đây là cách duy nhất tách được nhóm này mà không cần đổi
+ * gì ở phía người gửi link.
+ *
+ * Trả về null khi không nhận ra, để người gọi tự quyết định gọi là gì.
+ */
+export function inAppBrowser(ua?: string | null): string | null {
+  if (!ua) return null;
+  // Zalo đặt chuỗi "Zalo" kèm số hiệu bản dựng trong UA của webview.
+  if (/\bZalo\b/i.test(ua)) return 'zalo';
+  // FBAN/FBAV: ứng dụng Facebook. FB_IAB: trình duyệt nhúng. Messenger dùng
+  // FBAN/Messenger nên đã nằm trong cùng nhóm.
+  if (/FBAN|FBAV|FB_IAB|FBIOS/i.test(ua)) return 'facebook-app';
+  if (/\bInstagram\b/i.test(ua)) return 'instagram';
+  // TikTok webview đi dưới nhiều tên tuỳ thị trường và phiên bản.
+  if (/BytedanceWebview|musical_ly|\bTikTok\b/i.test(ua)) return 'tiktok';
+  return null;
+}
