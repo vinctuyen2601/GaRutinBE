@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
 import { GenerateContentDto, OptimizeSeoDto, ImproveContentDto, GenerateFromUrlDto, CrawlToDraftsDto } from './dto/ai-post.dto';
@@ -66,7 +66,12 @@ export class PostsService {
   /** Danh sách bài để nối. Không kéo `content` về — hàng megabyte mỗi lần lưu. */
   private async baiDeNoi(): Promise<BaiDeNoi[]> {
     return this.repo.find({
-      where: { status: 'published' },
+      // redirectTo IS NULL là BẮT BUỘC, không phải cho gọn: bài đã gộp vẫn
+      // mang status 'published', nên thiếu điều kiện này thì mỗi bài mới viết
+      // lại được chèn liên kết trỏ vào một trang chuyển hướng. Đã xảy ra thật
+      // ngày 15/09/2026 — bài mua-ga-rutin-mien-tay tạo xong là có ngay liên
+      // kết chết, phát hiện khi rà sau đợt gộp 15 bài.
+      where: { status: 'published', redirectTo: IsNull() },
       select: ['slug', 'title', 'tags', 'category'],
     }) as unknown as Promise<BaiDeNoi[]>;
   }
