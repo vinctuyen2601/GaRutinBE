@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { CanhModule } from './canh/canh.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -23,6 +25,8 @@ import { CustomersModule } from './customers/customers.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Cần cho tác vụ canh sức khoẻ chạy định kỳ — xem canh/canh.service.ts
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       ...(process.env.DATABASE_URL
@@ -56,6 +60,7 @@ import { CustomersModule } from './customers/customers.module';
     CustomersModule,
     NotificationsModule,
     ReviewsModule,
+    CanhModule,
   ],
 })
 export class AppModule {}

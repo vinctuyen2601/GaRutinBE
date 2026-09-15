@@ -23,6 +23,6 @@ import { AiPromptsModule } from '../ai-prompts/ai-prompts.module';
   ],
   providers: [KeywordsService, TroLyService, SearchService, SearchConsoleService, GoiYService],
   controllers: [KeywordsController],
-  exports: [KeywordsService],
+  exports: [KeywordsService, SearchConsoleService],
 })
 export class KeywordsModule {}
