@@ -134,6 +134,21 @@ export class KeywordsController {
   }
 
   /** Từ khoá có người tìm mà mình chưa có bài và chưa có hạng. */
+  /**
+   * Ai đang đứng trên mình cho từng từ khoá.
+   * Tối đa 10 từ mỗi lượt — xem chú thích ở troLy.doiThu về trần CloudFront.
+   */
+  @Post('doi-thu')
+  doiThu(@Body() body: { keywords?: string[] }) {
+    return this.troLy.doiThu(body?.keywords ?? []);
+  }
+
+  /** Danh sách từ khoá nhiều hiển thị nhất, để làm đầu vào cho doi-thu. */
+  @Get('hang-dau')
+  hangDau(@Query('so') so?: string) {
+    return this.troLy.tuKhoaHangDau(Number(so) || 10);
+  }
+
   @Get('vung-trang')
   vungTrang() {
     return this.troLy.vungTrang();

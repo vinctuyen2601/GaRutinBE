@@ -12,6 +12,7 @@ import { timBaiKhop, timBaiNhacToi, ketLuan, quaChung, rutDanY, type KetQuaPhanT
 import { callLLM, parseJsonFromAI } from '../common/llm';
 import { AiPromptsService } from '../ai-prompts/ai-prompts.service';
 import { sinhCumHoi, xepLoaiVungTrang, type DongVungTrang } from './vung-trang';
+import { phanTichSerp, type KetQuaSerp } from './doi-thu';
 
 export interface DongPhanTich extends KetQuaPhanTich {
   id: string;
@@ -271,10 +272,14 @@ export class TroLyService {
    * thiếu, chứ không phải liệt kê lại thứ mình đã có.
    */
   async layGoiY(tuKhoa: string) {
-    const [tuDong, serper] = await Promise.all([
-      this.goiY.tuDong(tuKhoa),
-      this.search.layGoiYTuKhoa(tuKhoa),
-    ]);
+    // Chỉ còn Autocomplete. Hai kênh "Mọi người cũng hỏi" và "Tìm kiếm liên
+    // quan" của serper.dev đã gỡ ngày 15/09/2026: đo thật bốn truy vấn —
+    // "gà rutin", "nuôi gà cảnh", "câu cá", "cách nuôi gà" — cả bốn đều trả
+    // về mảng rỗng, kể cả truy vấn rộng vốn chắc chắn có khối liên quan khi
+    // tìm bằng trình duyệt. Tài liệu serper ghi hai trường đó chỉ có "khi có".
+    // Giữ lại thì mỗi lần gọi tốn một credit để nhận về hai con số 0.
+    // Khoá serper nay dùng cho chức năng đối thủ, xem doiThu().
+    const tuDong = await this.goiY.tuDong(tuKhoa);
 
     const [posts, doc, kws, daGoiY] = await Promise.all([
       this.postRepo.find({
@@ -294,11 +299,7 @@ export class TroLyService {
       ...daGoiY.map((g) => g.keyword.toLowerCase()),
     ]);
 
-    const nguon: [string[], string][] = [
-      [tuDong, 'tu-dong'],
-      [serper.cauHoi, 'cau-hoi'],
-      [serper.lienQuan, 'lien-quan'],
-    ];
+    const nguon: [string[], string][] = [[tuDong, 'tu-dong']];
 
     let them = 0;
     let boQuaViDaCoBai = 0;
@@ -321,13 +322,6 @@ export class TroLyService {
       them,
       boQuaViDaCoBai,
       tuDong: tuDong.length,
-      cauHoi: serper.cauHoi.length,
-      lienQuan: serper.lienQuan.length,
-      // Đưa lý do hỏng ra tận phản hồi API. Trước đây thiếu khoá, khoá bị từ
-      // chối và lỗi mạng đều trả về đúng một thứ — hai số 0 — nên từ ngoài
-      // không cách nào biết phải sửa gì, phải vào máy chủ đọc log mới rõ.
-      // Vắng trường này nghĩa là gọi được, chỉ là Google không trả gợi ý nào.
-      ...(serper.loi ? { loiGoiY: serper.loi } : {}),
     };
   }
 
@@ -483,4 +477,41 @@ export class TroLyService {
     return this.gsc.layTheoTrang(soNgay);
   }
 
+  /**
+   * Đọc bảng xếp hạng Google cho tối đa 10 từ khoá một lượt.
+   *
+   * KHÔNG lưu vào CSDL: kết quả SERP hết hạn nhanh, lưu lại chỉ tạo ra một
+   * bảng số cũ mà ai đọc cũng tưởng là hiện tại. Cần thì gọi lại, một credit.
+   *
+   * GIỚI HẠN 10 LÀ BẮT BUỘC, không phải cho đẹp: API nằm sau CloudFront, bị
+   * cắt cứng ở 30 giây và khi đó trả về HTML 504 của chính nó — log ứng dụng
+   * không ghi gì, nên lỗi trông như backend im lặng. Mỗi từ khoá là một lời
+   * gọi mạng ra serper. Người gọi tự chia lô nếu cần quét nhiều hơn.
+   */
+  async doiThu(tuKhoas: string[]): Promise<KetQuaSerp[]> {
+    const ds = tuKhoas.map((t) => (t ?? '').trim()).filter(Boolean).slice(0, 10);
+    if (!ds.length) throw new BadRequestException('Cần ít nhất một từ khoá');
+
+    const mien = (process.env.WEB_URL || 'https://garutin.com')
+      .replace(/^https?:\/\//, '')
+      .replace(/\/.*$/, '');
+
+    // Song song: mười lời gọi tuần tự là mười giây, quá sát trần 30 giây.
+    return Promise.all(
+      ds.map(async (t) => {
+        const { organic, loi } = await this.search.docSerp(t);
+        const kq = phanTichSerp(t, organic, mien);
+        return loi ? { ...kq, loi } : kq;
+      }),
+    );
+  }
+
+  /** Lấy sẵn các từ khoá nhiều hiển thị nhất, khỏi phải tự gõ danh sách. */
+  async tuKhoaHangDau(soTu = 10): Promise<string[]> {
+    const kws = await this.kwRepo.find({
+      order: { impressions: 'DESC' },
+      take: Math.min(soTu, 50),
+    });
+    return kws.map((k) => k.keyword);
+  }
 }
