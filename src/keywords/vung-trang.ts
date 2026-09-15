@@ -105,9 +105,35 @@ export function xepLoaiVungTrang(
   const demCum = new Map<string, number>();
   for (const k of goiY) demCum.set(loi(k), (demCum.get(loi(k)) ?? 0) + 1);
 
+  /*
+   * Từ LÕI của truy vấn: bỏ bổ ngữ và từ quá ngắn.
+   *
+   * Bản đầu đòi tiêu đề chứa NGUYÊN CỤM truy vấn, và nó báo 227/228 là vùng
+   * trắng cho một site 94 bài — con số vô lý. Ví dụ thật: "giá trứng gà rutin"
+   * bị xếp vùng trắng trong khi shop có 11 bài về trứng, chỉ vì không tiêu đề
+   * nào chứa đúng chuỗi "giá trứng gà rutin".
+   *
+   * Nay khớp theo TẬP TỪ LÕI. Vẫn không bỏ dấu — `lồng` với `lông` phải khác
+   * nhau.
+   */
+  const BO_NGU = new Set([
+    'giá', 'mua', 'bán', 'đâu', 'bao', 'nhiêu', 'tiền', 'cách', 'các', 'một',
+    'quả', 'con', 'của', 'cho', 'với', 'khi', 'nào', 'sao', 'thế', 'như',
+    'tốt', 'không', 'nên', 'hôm', 'nay', 'địa', 'chỉ', 'thu', 'trị',
+  ]);
+  const tuLoi = (k: string) =>
+    bo(k).split(/\s+/).filter((w) => w.length > 2 && !BO_NGU.has(w));
+
   return goiY.map((keyword) => {
     const k = bo(keyword);
-    const bai = tuBai.find((b) => b.t.includes(k)) ?? null;
+    const loiTu = tuLoi(keyword);
+    // Coi là ĐÃ CÓ BÀI khi tiêu đề chứa từ 80% số từ lõi trở lên. Đòi 100% thì
+    // "ấp trứng gà rutin mùa đông" trượt khỏi bài "Nuôi gà rutin mùa đông".
+    const bai =
+      tuBai.find((b) => b.t.includes(k)) ??
+      (loiTu.length
+        ? tuBai.find((b) => loiTu.filter((w) => b.t.includes(w)).length / loiTu.length >= 0.8) ?? null
+        : null);
     const loai: XepLoai = hang.has(k) ? 'da-xep-hang' : bai ? 'co-bai-chua-hang' : 'vung-trang';
     const thuongMai = laThuongMai(keyword);
     const coCum = demCum.get(loi(keyword)) ?? 1;

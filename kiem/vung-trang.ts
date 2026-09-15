@@ -46,6 +46,20 @@ kiem('xếp giảm dần theo điểm',
   ra.every((x, i) => i === 0 || ra[i - 1].diem >= x.diem), true);
 kiem('danh sách rỗng không nổ', xepLoaiVungTrang([], [], []).length, 0);
 
+// Khớp theo TẬP TỪ LÕI, không đòi nguyên cụm. Bản đầu báo 227/228 vùng trắng
+// cho site 94 bài vì đòi tiêu đề chứa đúng chuỗi truy vấn.
+const r3 = xepLoaiVungTrang(
+  ['giá trứng gà rutin', 'mua trứng gà rutin ở đâu', 'gà rutin đồng nai'],
+  [],
+  [{ slug: 'trung-ga-rutin', title: 'Trứng gà rutin: tác dụng và số lượng nên ăn' }],
+);
+kiem('"giá trứng gà rutin" khớp bài về trứng',
+  r3.find((x) => x.keyword === 'giá trứng gà rutin')!.loai, 'co-bai-chua-hang');
+kiem('"mua trứng gà rutin ở đâu" cũng khớp',
+  r3.find((x) => x.keyword === 'mua trứng gà rutin ở đâu')!.loai, 'co-bai-chua-hang');
+kiem('"gà rutin đồng nai" VẪN là vùng trắng',
+  r3.find((x) => x.keyword === 'gà rutin đồng nai')!.loai, 'vung-trang');
+
 // Cụm lõi KHÔNG bỏ dấu: `lông` và `lồng` phải là hai chùm khác nhau.
 const r2 = xepLoaiVungTrang(['lồng gà rutin', 'lông gà rutin', 'lồng gà rutin đẹp'], [], []);
 kiem('lồng/lông không bị gom chung chùm',
