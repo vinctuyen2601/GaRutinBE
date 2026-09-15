@@ -142,6 +142,12 @@ export class KeywordsController {
    * URL có trong chỉ mục Google không, và nếu không thì vì sao.
    * Tối đa 10 URL mỗi lượt — trần 30 giây của CloudFront.
    */
+  /** Google đã đọc sitemap chưa, lần cuối bao giờ. */
+  @Get('sitemap')
+  trangThaiSitemap() {
+    return this.troLy.trangThaiSitemap();
+  }
+
   @Post('kiem-chi-muc')
   kiemChiMuc(@Body() body: { urls?: string[] }) {
     return this.troLy.kiemChiMuc(body?.urls ?? []);

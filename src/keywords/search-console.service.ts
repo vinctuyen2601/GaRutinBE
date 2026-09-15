@@ -296,4 +296,41 @@ export class SearchConsoleService {
       }),
     );
   }
+
+  /**
+   * Google đã đọc sitemap chưa, lần cuối là bao giờ, khai bao nhiêu URL.
+   *
+   * VÌ SAO CẦN: ngày 15/09/2026 đo ra 19 URL ở trạng thái "Google không xác
+   * định được URL" dù chúng nằm sẵn trong sitemap. Hai cách giải thích ngược
+   * nhau: sitemap chưa từng được gửi/đọc, hoặc đã đọc nhưng Google chủ động bỏ
+   * qua vì ngân sách thu thập. Trường `lastDownloaded` phân biệt hai thứ đó,
+   * và chỉ một trong hai sửa được bằng một cú bấm nút.
+   */
+  async trangThaiSitemap(): Promise<any> {
+    const { site } = this.cauHinh;
+    if (!this.daCauHinh()) {
+      throw new BadRequestException(
+        'Chưa cấu hình GSC_CLIENT_EMAIL, GSC_PRIVATE_KEY và GSC_SITE_URL trên máy chủ',
+      );
+    }
+    const token = await this.layToken();
+    const res = await fetch(
+      `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site!)}/sitemaps`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) {
+      const than = await res.text().catch(() => '');
+      return { loi: `http-${res.status}: ${than.slice(0, 300)}` };
+    }
+    const d: any = await res.json();
+    return (d.sitemap || []).map((x: any) => ({
+      duongDan: x.path,
+      lanCuoiTaiVe: x.lastDownloaded,
+      lanCuoiGui: x.lastSubmitted,
+      coLoi: x.errors,
+      canhBao: x.warnings,
+      daXuLy: x.isPending === false,
+      noiDung: x.contents,
+    }));
+  }
 }

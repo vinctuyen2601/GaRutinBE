@@ -482,6 +482,10 @@ export class TroLyService {
     return this.gsc.kiemTraUrl(urls);
   }
 
+  trangThaiSitemap() {
+    return this.gsc.trangThaiSitemap();
+  }
+
   /**
    * Đọc bảng xếp hạng Google cho tối đa 10 từ khoá một lượt.
    *
