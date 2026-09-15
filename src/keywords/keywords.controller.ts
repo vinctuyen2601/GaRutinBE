@@ -127,4 +127,16 @@ export class KeywordsController {
     return this.troLy.theoTrangGsc(Number(soNgay) || 90);
   }
 
+  /** Đào Autocomplete có hệ thống quanh các cụm gốc do người dùng đưa. */
+  @Post('mo-rong')
+  moRong(@Body() body: { cumGoc?: string[]; toiDa?: number }) {
+    return this.troLy.moRong(body?.cumGoc ?? [], body?.toiDa ?? 120);
+  }
+
+  /** Từ khoá có người tìm mà mình chưa có bài và chưa có hạng. */
+  @Get('vung-trang')
+  vungTrang() {
+    return this.troLy.vungTrang();
+  }
+
 }

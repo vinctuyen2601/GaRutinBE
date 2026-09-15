@@ -11,6 +11,7 @@ import { GoiYService } from './goi-y.service';
 import { timBaiKhop, timBaiNhacToi, ketLuan, quaChung, rutDanY, type KetQuaPhanTich } from './phan-tich';
 import { callLLM, parseJsonFromAI } from '../common/llm';
 import { AiPromptsService } from '../ai-prompts/ai-prompts.service';
+import { sinhCumHoi, xepLoaiVungTrang, type DongVungTrang } from './vung-trang';
 
 export interface DongPhanTich extends KetQuaPhanTich {
   id: string;
@@ -342,6 +343,62 @@ export class TroLyService {
       them += r.them;
     }
     return { them, soTuGoc: kws.length };
+  }
+
+  /**
+   * MỞ RỘNG — đào Autocomplete có hệ thống thay vì gõ tay từng cụm.
+   *
+   * quetSau() cũ chỉ lấy 12 từ khoá SẴN CÓ làm gốc, nên nó chỉ đào sâu quanh
+   * chỗ mình đã đứng. Hàm này khác: nó ghép cụm gốc với bổ ngữ và với từng
+   * chữ cái, tức là quét cả những hướng mình chưa từng nghĩ tới.
+   *
+   * Autocomplete chỉ trả về cụm CÓ NGƯỜI GÕ THẬT, nên lưới quét dù rộng cũng
+   * không sinh ra rác — cụm nào không ai tìm thì Google im lặng.
+   *
+   * Chạy tuần tự có nghỉ: gọi dồn dập thì Google chặn tạm và trả rỗng, lúc đó
+   * kết quả trông như "không có nhu cầu" mà thực ra là bị chặn.
+   */
+  async moRong(cumGoc: string[], toiDa = 120) {
+    const cum = sinhCumHoi(cumGoc, toiDa);
+    let them = 0, hoi = 0, rong = 0;
+    for (const c of cum) {
+      const r = await this.layGoiY(c);
+      them += r.them;
+      hoi++;
+      if (r.tuDong === 0) rong++;
+      await new Promise((s) => setTimeout(s, 120));
+    }
+    // Rỗng gần hết là dấu hiệu BỊ CHẶN, không phải hết nhu cầu. Nói ra để
+    // người đọc kết quả không kết luận ngược.
+    const nghiBiChan = hoi > 10 && rong / hoi > 0.9;
+    return { daHoi: hoi, them, rong, nghiBiChan };
+  }
+
+  /**
+   * VÙNG TRẮNG — gợi ý nào mình chưa có bài và chưa có hạng.
+   *
+   * Ghép ba nguồn: gợi ý Autocomplete đã thu, từ khoá Search Console đã có
+   * hiển thị, và danh sách bài đang sống. Bài đã gộp bị loại — nó không còn
+   * nội dung riêng nên không nhắm được từ khoá nào.
+   */
+  async vungTrang(): Promise<{
+    tong: number;
+    theoLoai: Record<string, number>;
+    dong: DongVungTrang[];
+  }> {
+    const [goiY, kws, posts] = await Promise.all([
+      this.ggRepo.find({ select: ['keyword', 'daBoQua'] }),
+      this.kwRepo.find({ select: ['keyword', 'impressions'] }),
+      this.postRepo.find({ select: ['slug', 'title'], where: { redirectTo: IsNull() } }),
+    ]);
+    const dong = xepLoaiVungTrang(
+      goiY.filter((g) => !g.daBoQua).map((g) => g.keyword),
+      kws.filter((k) => Number(k.impressions ?? 0) > 0).map((k) => k.keyword),
+      posts.map((p) => ({ slug: p.slug, title: p.title })),
+    );
+    const theoLoai: Record<string, number> = {};
+    for (const d of dong) theoLoai[d.loai] = (theoLoai[d.loai] ?? 0) + 1;
+    return { tong: dong.length, theoLoai, dong };
   }
 
   /** Kéo số liệu thẳng từ Search Console, khỏi phải dán tay. */
