@@ -59,28 +59,3 @@ jobs:
             pm2 show garutin-be
             echo "=== LAST 30 LINES LOG ==="
             pm2 logs garutin-be --lines 30 --nostream
-
-      # Deploy hỏng thì phải BIẾT NGAY, không phải phát hiện sau khi ngồi đoán
-      # vì sao mã mới không lên. Ngày 15/09/2026 mất mười phút truy chuyện đó:
-      # API vẫn trả 200 nên trông như bình thường, chỉ là đang chạy mã cũ.
-      #
-      # `if: failure()` nên bước này chỉ chạy khi có bước trước đó hỏng.
-      # Thiếu secret thì bỏ qua im lặng — không làm đỏ thêm một lần chạy vốn
-      # đã đỏ, và không lộ chuyện thiếu cấu hình ra log công khai.
-      - name: Bao Telegram khi deploy hong
-        if: failure()
-        env:
-          BOT: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          if [ -z "$BOT" ] || [ -z "$CHAT" ]; then
-            echo "Chua dat TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID, bo qua buoc bao."
-            exit 0
-          fi
-          TIN="🔴 DEPLOY HỎNG — ${{ github.repository }}
-          commit: ${{ github.sha }}
-          $(echo '${{ github.event.head_commit.message }}' | head -1)
-          Xem: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -s -X POST "https://api.telegram.org/bot$BOT/sendMessage" \
-            --data-urlencode "chat_id=$CHAT" \
-            --data-urlencode "text=$TIN" > /dev/null || true
