@@ -129,8 +129,8 @@ export class KeywordsController {
 
   /** Đào Autocomplete có hệ thống quanh các cụm gốc do người dùng đưa. */
   @Post('mo-rong')
-  moRong(@Body() body: { cumGoc?: string[]; toiDa?: number }) {
-    return this.troLy.moRong(body?.cumGoc ?? [], body?.toiDa ?? 120);
+  moRong(@Body() body: { cumGoc?: string[]; dot?: number; moiDot?: number }) {
+    return this.troLy.moRong(body?.cumGoc ?? [], body?.dot ?? 0, body?.moiDot ?? 25);
   }
 
   /** Từ khoá có người tìm mà mình chưa có bài và chưa có hạng. */

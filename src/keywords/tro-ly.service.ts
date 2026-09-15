@@ -346,32 +346,46 @@ export class TroLyService {
   }
 
   /**
-   * MỞ RỘNG — đào Autocomplete có hệ thống thay vì gõ tay từng cụm.
+   * MỞ RỘNG — đào Autocomplete có hệ thống, CHIA ĐỢT.
    *
    * quetSau() cũ chỉ lấy 12 từ khoá SẴN CÓ làm gốc, nên nó chỉ đào sâu quanh
-   * chỗ mình đã đứng. Hàm này khác: nó ghép cụm gốc với bổ ngữ và với từng
-   * chữ cái, tức là quét cả những hướng mình chưa từng nghĩ tới.
+   * chỗ mình đã đứng. Hàm này ghép cụm gốc với bổ ngữ và với từng chữ cái,
+   * tức là quét cả những hướng mình chưa từng nghĩ tới.
    *
    * Autocomplete chỉ trả về cụm CÓ NGƯỜI GÕ THẬT, nên lưới quét dù rộng cũng
    * không sinh ra rác — cụm nào không ai tìm thì Google im lặng.
    *
-   * Chạy tuần tự có nghỉ: gọi dồn dập thì Google chặn tạm và trả rỗng, lúc đó
-   * kết quả trông như "không có nhu cầu" mà thực ra là bị chặn.
+   * VÌ SAO CHIA ĐỢT: API nằm sau CloudFront, bị cắt ở 30 GIÂY và trả HTML 504
+   * của chính nó, log ứng dụng không ghi gì. Bản đầu chạy thẳng 90 cụm với
+   * 120ms nghỉ mỗi cụm — riêng phần nghỉ đã 10,8 giây, cộng độ trễ mạng là
+   * vượt trần. Đã dính thật khi thử.
+   *
+   * Nay mỗi lệnh gọi xử lý MỘT ĐỢT nhỏ và trả về `conLai` để bên gọi lặp tiếp.
+   * Không cần hàng đợi, không cần hạ tầng mới, và mỗi lệnh luôn dưới trần.
    */
-  async moRong(cumGoc: string[], toiDa = 120) {
-    const cum = sinhCumHoi(cumGoc, toiDa);
-    let them = 0, hoi = 0, rong = 0;
-    for (const c of cum) {
+  async moRong(cumGoc: string[], dot = 0, moiDot = 25) {
+    const tatCa = sinhCumHoi(cumGoc, 400);
+    const batDau = Math.max(0, dot) * moiDot;
+    const phan = tatCa.slice(batDau, batDau + moiDot);
+
+    let them = 0, rong = 0;
+    for (const c of phan) {
       const r = await this.layGoiY(c);
       them += r.them;
-      hoi++;
       if (r.tuDong === 0) rong++;
-      await new Promise((s) => setTimeout(s, 120));
+      await new Promise((s) => setTimeout(s, 80));
     }
-    // Rỗng gần hết là dấu hiệu BỊ CHẶN, không phải hết nhu cầu. Nói ra để
+    // Rỗng gần hết là dấu hiệu BỊ CHẶN TẠM, không phải hết nhu cầu. Nói ra để
     // người đọc kết quả không kết luận ngược.
-    const nghiBiChan = hoi > 10 && rong / hoi > 0.9;
-    return { daHoi: hoi, them, rong, nghiBiChan };
+    return {
+      dot,
+      daHoi: phan.length,
+      them,
+      rong,
+      nghiBiChan: phan.length > 8 && rong / phan.length > 0.9,
+      tongCum: tatCa.length,
+      conLai: Math.max(0, tatCa.length - (batDau + phan.length)),
+    };
   }
 
   /**
