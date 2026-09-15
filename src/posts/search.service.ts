@@ -90,11 +90,13 @@ export class SearchService {
    * nằm sẵn trong phản hồi và đã được trả tiền — mỗi câu trong peopleAlsoAsk
    * là một câu hỏi THẬT người dùng gõ, tức một tiêu đề bài viết có sẵn nhu cầu.
    */
-  async layGoiYTuKhoa(keyword: string): Promise<{ cauHoi: string[]; lienQuan: string[] }> {
+  async layGoiYTuKhoa(
+    keyword: string,
+  ): Promise<{ cauHoi: string[]; lienQuan: string[]; loi?: string }> {
     const apiKey = process.env.SERPER_API_KEY;
     if (!apiKey) {
       this.logger.warn('SERPER_API_KEY chưa được cấu hình');
-      return { cauHoi: [], lienQuan: [] };
+      return { cauHoi: [], lienQuan: [], loi: 'thieu-khoa' };
     }
     try {
       const res = await fetch('https://google.serper.dev/search', {
@@ -103,8 +105,16 @@ export class SearchService {
         body: JSON.stringify({ q: keyword, hl: 'vi', gl: 'vn', num: 10 }),
       });
       if (!res.ok) {
-        this.logger.warn(`Serper gợi ý lỗi: ${res.status}`);
-        return { cauHoi: [], lienQuan: [] };
+        // Đọc cả thân phản hồi: serper.dev nói rõ "Unauthorized" hay
+        // "Not enough credits" ở đây, mà chỉ riêng mã trạng thái thì không
+        // phân biệt được hai thứ đó.
+        const than = await res.text().catch(() => '');
+        this.logger.warn(`Serper gợi ý lỗi: ${res.status} ${than.slice(0, 200)}`);
+        return {
+          cauHoi: [],
+          lienQuan: [],
+          loi: `http-${res.status}: ${than.slice(0, 120)}`,
+        };
       }
       const data: any = await res.json();
       return {
@@ -114,7 +124,7 @@ export class SearchService {
     } catch (e: any) {
       // Gợi ý hỏng không được làm chết cả trang — trả rỗng và ghi log.
       this.logger.error(`Serper gợi ý thất bại: ${e.message}`);
-      return { cauHoi: [], lienQuan: [] };
+      return { cauHoi: [], lienQuan: [], loi: `ngoai-le: ${e.message}` };
     }
   }
 

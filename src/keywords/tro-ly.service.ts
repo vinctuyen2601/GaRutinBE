@@ -323,6 +323,11 @@ export class TroLyService {
       tuDong: tuDong.length,
       cauHoi: serper.cauHoi.length,
       lienQuan: serper.lienQuan.length,
+      // Đưa lý do hỏng ra tận phản hồi API. Trước đây thiếu khoá, khoá bị từ
+      // chối và lỗi mạng đều trả về đúng một thứ — hai số 0 — nên từ ngoài
+      // không cách nào biết phải sửa gì, phải vào máy chủ đọc log mới rõ.
+      // Vắng trường này nghĩa là gọi được, chỉ là Google không trả gợi ý nào.
+      ...(serper.loi ? { loiGoiY: serper.loi } : {}),
     };
   }
 
