@@ -4,5 +4,15 @@
   // suy ra thư mục gốc chung; thêm một tệp .ts ngoài src/ là gốc nhảy lên thư
   // mục dự án, dist/main.js dời sang dist/src/main.js và pm2 không tìm thấy —
   // API chết mà biên dịch vẫn báo thành công. Đã xảy ra thật ở 17Fishing.
-  "exclude": ["node_modules", "test", "dist", "scripts", "**/*spec.ts"]
+  /*
+   * rootDir ghim để lần sau HỎNG TO NGAY LÚC BUILD thay vì hỏng im lặng lúc
+   * deploy: quên thêm thư mục mới vào exclude thì tsc báo "is not under
+   * rootDir" và CI dừng, chứ không lặng lẽ dời dist/ rồi giết máy chủ.
+   *
+   * Ngày 15/09/2026 bên 17fishing đã dính đúng bẫy này khi thêm thư mục kiem/:
+   * deploy chết ở bước migration, và dist trên máy chủ sai suốt cho tới khi
+   * sửa xong. Chú thích bên trên tả đúng chuyện đó mà vẫn dính.
+   */
+  "compilerOptions": { "rootDir": "./src" },
+  "exclude": ["node_modules", "test", "dist", "scripts", "kiem", "**/*spec.ts"]
 }

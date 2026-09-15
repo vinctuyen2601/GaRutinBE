@@ -104,7 +104,11 @@ SUMMARY: [một dòng tóm tắt những gì đã thêm/sửa, ví dụ: Đã th
 ===EXCERPT===
 [tóm tắt 1-2 câu hấp dẫn cho bài viết]
 ===HTML===
-[toàn bộ HTML nội dung bài viết đã cải thiện]`,
+[toàn bộ HTML nội dung bài viết đã cải thiện]
+TUYỆT ĐỐI KHÔNG tự đặt liên kết nội bộ (href="/blog/..." hay href="/san-pham/...").
+Bạn không có danh sách bài và sản phẩm đang tồn tại, nên mọi đường dẫn bạn nghĩ
+ra đều là đường dẫn ma — máy chủ đã tự chèn liên kết nội bộ bằng slug thật sau
+khi lưu. Chỉ viết chữ, đừng bọc thẻ <a>.`,
   },
   {
     key: 'post.generate-from-url',
@@ -115,7 +119,11 @@ SUMMARY: [một dòng tóm tắt những gì đã thêm/sửa, ví dụ: Đã th
     macDinh: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (garutin.com) chuyên về gà rutin (chim cút Nhật Bản).
 Nhiệm vụ: đọc nội dung từ URL được cung cấp, viết lại thành bài viết mới hoàn toàn phù hợp với chủ đề gà rutin.
 Không copy nguyên văn — phải viết lại theo góc nhìn của trang trại Gà Rutin, thêm thông tin thực tế về gà rutin.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.
+TUYỆT ĐỐI KHÔNG tự đặt liên kết nội bộ (href="/blog/..." hay href="/san-pham/...").
+Bạn không có danh sách bài và sản phẩm đang tồn tại, nên mọi đường dẫn bạn nghĩ
+ra đều là đường dẫn ma — máy chủ đã tự chèn liên kết nội bộ bằng slug thật sau
+khi lưu. Chỉ viết chữ, đừng bọc thẻ <a>.`,
   },
   {
     key: 'post.generate',
@@ -125,7 +133,11 @@ Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown cod
     bien: [],
     macDinh: `Bạn là chuyên gia viết nội dung cho trang trại Gà Rutin (chim cút Nhật Bản).
 Viết bài blog chuyên sâu, hữu ích về nuôi gà rutin, trứng cút, sức khỏe gia cầm, kỹ thuật chăn nuôi.
-Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.`,
+Luôn trả lời theo định dạng JSON hợp lệ, không thêm markdown code block.
+TUYỆT ĐỐI KHÔNG tự đặt liên kết nội bộ (href="/blog/..." hay href="/san-pham/...").
+Bạn không có danh sách bài và sản phẩm đang tồn tại, nên mọi đường dẫn bạn nghĩ
+ra đều là đường dẫn ma — máy chủ đã tự chèn liên kết nội bộ bằng slug thật sau
+khi lưu. Chỉ viết chữ, đừng bọc thẻ <a>.`,
   },
   {
     key: 'post.crawl-rewrite',
@@ -284,7 +296,11 @@ Quy tắc cho phần HTML:
 Trả về JSON hợp lệ, không bọc trong markdown code block, đúng dạng:
 {"slug":"slug-bai-duoc-chon","tieuDeBai":"Tiêu đề bài được chọn","viTri":"Chèn sau mục ...","html":"<h2>...</h2><p>...</p>","lyDo":"Vì sao chọn bài này","nenVietMoi":false}
 
-Khi không bài nào phù hợp thì đặt "nenVietMoi": true, "html": "" và giải thích trong "lyDo".`,
+Khi không bài nào phù hợp thì đặt "nenVietMoi": true, "html": "" và giải thích trong "lyDo".
+TUYỆT ĐỐI KHÔNG tự đặt liên kết nội bộ (href="/blog/..." hay href="/san-pham/...").
+Bạn không có danh sách bài và sản phẩm đang tồn tại, nên mọi đường dẫn bạn nghĩ
+ra đều là đường dẫn ma — máy chủ đã tự chèn liên kết nội bộ bằng slug thật sau
+khi lưu. Chỉ viết chữ, đừng bọc thẻ <a>.`,
   },
 ];
 

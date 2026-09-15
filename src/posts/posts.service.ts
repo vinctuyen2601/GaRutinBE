@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
@@ -10,9 +10,12 @@ import { SearchService } from './search.service';
 import { KeywordsService } from '../keywords/keywords.service';
 import { PostTemplatesService } from '../post-templates/post-templates.service';
 import { AiPromptsService } from '../ai-prompts/ai-prompts.service';
+import { noiNoiBo, type BaiDeNoi } from './noi-noi-bo';
 
 @Injectable()
 export class PostsService {
+  private readonly logger = new Logger(PostsService.name);
+
   constructor(
     @InjectRepository(Post)
     private readonly repo: Repository<Post>,
@@ -60,10 +63,25 @@ export class PostsService {
     return this.repo.findOne({ where: { id } });
   }
 
+  /** Danh sách bài để nối. Không kéo `content` về — hàng megabyte mỗi lần lưu. */
+  private async baiDeNoi(): Promise<BaiDeNoi[]> {
+    return this.repo.find({
+      where: { status: 'published' },
+      select: ['slug', 'title', 'tags', 'category'],
+    }) as unknown as Promise<BaiDeNoi[]>;
+  }
+
   async create(dto: CreatePostDto): Promise<Post> {
     const post = this.repo.create(dto);
     if (dto.status === 'published' && !dto.publishedAt) {
       post.publishedAt = new Date();
+    }
+    // Hỏng ở đây KHÔNG được chặn việc lưu: mất mấy liên kết là mất một phần
+    // tín hiệu SEO, còn mất bài là mất công viết.
+    try {
+      post.content = noiNoiBo(post.content, post, await this.baiDeNoi());
+    } catch (err) {
+      this.logger.warn(`Không nối được liên kết nội bộ: ${(err as Error).message}`);
     }
     return this.repo.save(post);
   }
@@ -158,6 +176,15 @@ export class PostsService {
       dto.publishedAt = new Date().toISOString();
     }
     Object.assign(post, dto);
+    // Chỉ nối lại khi nội dung thật sự đổi. Hàm tự bỏ qua đích đã có liên kết
+    // nên chạy lại nhiều lần không sinh link trùng.
+    if (dto.content !== undefined) {
+      try {
+        post.content = noiNoiBo(post.content, post, await this.baiDeNoi());
+      } catch (err) {
+        this.logger.warn(`Không nối được liên kết nội bộ: ${(err as Error).message}`);
+      }
+    }
     return this.repo.save(post);
   }
 

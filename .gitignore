@@ -79,3 +79,7 @@ _bmad*
 !.claude/agents/
 .agents
 
+# Cache biên dịch tăng dần. Phải bỏ qua, và prebuild cũng xoá nó: còn cache
+# mà dist bị xoá thì tsc không phát lại tệp nào, build "thành công" với dist
+# RỖNG, và deploy chết ở bước migration.
+*.tsbuildinfo
