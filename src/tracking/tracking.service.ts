@@ -14,14 +14,63 @@ const PLATFORMS: Platform[] = ['facebook', 'youtube', 'tiktok', 'zalo', 'web', '
  * phải URL sẽ làm `new URL()` ném lỗi và hỏng cả lượt ghi nhận, chỉ vì một
  * trường phụ dùng để làm báo cáo.
  */
+/**
+ * Tên miền gốc của shop, không kèm www. Lấy từ cùng biến môi trường mà phần
+ * sinh sitemap dùng, nên đổi tên miền là chỗ này đổi theo.
+ */
+const MIEN_NHA = (process.env.SITE_URL || 'https://garutin.com')
+  .replace(/^https?:\/\//, '')
+  .replace(/^www\./, '')
+  .replace(/\/.*$/, '')
+  .toLowerCase();
+
+/**
+ * Referrer này có phải của chính mình không — kể cả tên miền con.
+ *
+ * VÌ SAO CẦN: ngày 15/09/2026 bảng Nguồn truy cập bên 17fishing hiện
+ * `admin.<tên miền>` với 8 lượt xem như thể đó là một nguồn khách. Thực ra là
+ * chủ shop bấm xem trước từ CMS — trình duyệt gửi referrer là trang admin.
+ * Shop này dùng cùng kiểu tên miền con nên dính y hệt.
+ *
+ * Hai cái hại: bảng nguồn bị pha loãng bằng lượt của chính mình, và một lượt
+ * đáng lẽ là "trực tiếp" bị gán nhầm nguồn nên con số đó cũng sai theo.
+ *
+ * So bằng hậu tố CÓ DẤU CHẤM, không dùng endsWith trần:
+ * `endsWith('garutin.com')` khớp luôn cả `giagarutin.com` của người khác.
+ */
+function laNhaMinh(host: string | null): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  return h === MIEN_NHA || h.endsWith(`.${MIEN_NHA}`);
+}
+
+/**
+ * Lấy host từ URL, bỏ www. Trả null nếu rỗng, không hợp lệ, hoặc là tên miền
+ * của chính mình — null rơi xuống 'trực tiếp' ở biểu thức nguồn.
+ */
 function hostCua(url?: string): string | null {
   if (!url) return null;
   try {
-    return new URL(url).hostname.replace(/^www\./, '').slice(0, 200);
+    const h = new URL(url).hostname.replace(/^www\./, '').slice(0, 200);
+    return laNhaMinh(h) ? null : h;
   } catch {
     return null;
   }
 }
+
+/**
+ * `referrer_host` đã lọc bỏ tên miền của chính mình, dùng trong MỌI truy vấn
+ * phân loại nguồn.
+ *
+ * Phải gom một chỗ vì lỗi ngày 15/09/2026 nằm ở HAI cột chứ không phải một:
+ * sửa cột "nguồn" mà quên cột "loại kênh" thì lượt truy cập từ CMS biến mất
+ * khỏi bảng nguồn nhưng vẫn được đếm là "giới thiệu" ở bảng kênh — hai bảng
+ * nói hai chuyện khác nhau về cùng một lượt xem.
+ */
+const REF_SACH = `NULLIF(CASE
+  WHEN v.referrer_host = '${MIEN_NHA}' OR v.referrer_host LIKE '%.${MIEN_NHA}'
+  THEN '' ELSE v.referrer_host
+END, '')`;
 
 /**
  * Điều kiện "một lượt xem thật".
@@ -128,7 +177,10 @@ export class TrackingService {
 
     const rows = await this.visitRepo.query(
       `SELECT COALESCE(NULLIF(v.utm_source, ''),
-                       NULLIF(v.referrer_host, ''),
+                       -- Bỏ referrer của chính mình NGAY Ở TẦNG ĐỌC: bản ghi
+                       -- cũ đã lỡ lưu admin.<tên miền> vẫn nằm đó, sửa tầng
+                       -- ghi không làm chúng biến mất.
+                       ${REF_SACH},
                        'trực tiếp')                       AS source,
               COALESCE(NULLIF(v.utm_campaign, ''), '—')   AS campaign,
               CASE
@@ -147,15 +199,15 @@ export class TrackingService {
                 -- link chúng đưa cho người dùng. Xếp chung vào "chiến dịch" là
                 -- báo cáo sai: shop không hề chạy chiến dịch nào ở đó, mà đây
                 -- lại là kênh đáng theo dõi riêng vì đang lớn dần.
-                WHEN LOWER(COALESCE(NULLIF(v.utm_source, ''), v.referrer_host, ''))
+                WHEN LOWER(COALESCE(NULLIF(v.utm_source, ''), ${REF_SACH}, ''))
                      ~ '(chatgpt|openai|perplexity|copilot|gemini|claude)'
                   THEN 'trợ lý AI'
                 -- Máy tìm kiếm, kể cả khi tên nằm ở utm_source do bên kia gắn.
-                WHEN COALESCE(NULLIF(v.utm_source, ''), v.referrer_host, '')
+                WHEN COALESCE(NULLIF(v.utm_source, ''), ${REF_SACH}, '')
                      ~ '^(www\.)?(google|bing|coccoc|duckduckgo|yandex)\.'
                   OR v.referrer_host IN ('search.yahoo.com','vn.search.yahoo.com')
                   THEN 'tự nhiên (SEO)'
-                WHEN COALESCE(NULLIF(v.utm_source, ''), NULLIF(v.referrer_host, '')) IS NOT NULL
+                WHEN COALESCE(NULLIF(v.utm_source, ''), ${REF_SACH}) IS NOT NULL
                   THEN 'giới thiệu'
                 ELSE 'trực tiếp'
               END                                          AS loai,
