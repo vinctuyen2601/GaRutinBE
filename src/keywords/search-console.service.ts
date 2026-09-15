@@ -221,4 +221,79 @@ export class SearchConsoleService {
     }));
   }
 
+  /**
+   * Hỏi Google: URL này có trong chỉ mục không, và nếu không thì vì sao.
+   *
+   * VÌ SAO CẦN: ngày 15/09/2026 phát hiện tìm bằng ĐÚNG tiêu đề của bài — chuỗi
+   * dài không ai cạnh tranh — mà bài không hiện ra, còn trang danh sách /blog
+   * lại hiện. Đó là dấu hiệu bài chưa vào chỉ mục. Không có phép kiểm này thì
+   * chỉ đoán được, mà đoán sai ở đây rất đắt: viết thêm bài cho một site không
+   * được lập chỉ mục là đổ công vào chỗ không ai đọc.
+   *
+   * `coverageState` là trường đáng đọc nhất, và mỗi giá trị là một việc khác
+   * hẳn nhau:
+   *   - "Submitted and indexed"            → ổn
+   *   - "Crawled - currently not indexed"  → Google ĐÃ đọc rồi chủ động không
+   *     lập chỉ mục. Thường là đánh giá nội dung mỏng hoặc trùng lặp.
+   *   - "Discovered - currently not indexed" → chưa buồn đọc. Thường là ngân
+   *     sách thu thập, tức vấn đề thẩm quyền và liên kết chứ không phải nội dung.
+   *   - "URL is unknown to Google"         → chưa biết tới URL này bao giờ.
+   *
+   * Hạn mức API là 2.000 lượt/ngày, nhưng giới hạn 10 URL mỗi lượt ở đây là vì
+   * trần 30 giây của CloudFront — mỗi URL là một lời gọi mạng tới Google.
+   */
+  async kiemTraUrl(urls: string[]): Promise<
+    {
+      url: string;
+      trangThai?: string;
+      robots?: string;
+      lanCuoiThuThap?: string;
+      urlChinhTac?: string;
+      loi?: string;
+    }[]
+  > {
+    const { site } = this.cauHinh;
+    if (!this.daCauHinh()) {
+      throw new BadRequestException(
+        'Chưa cấu hình GSC_CLIENT_EMAIL, GSC_PRIVATE_KEY và GSC_SITE_URL trên máy chủ',
+      );
+    }
+    const ds = urls.map((u) => (u ?? '').trim()).filter(Boolean).slice(0, 10);
+    if (!ds.length) throw new BadRequestException('Cần ít nhất một URL');
+
+    const token = await this.layToken();
+
+    return Promise.all(
+      ds.map(async (url) => {
+        try {
+          const res = await fetch(
+            'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ inspectionUrl: url, siteUrl: site, languageCode: 'vi' }),
+            },
+          );
+          if (!res.ok) {
+            const than = await res.text().catch(() => '');
+            return { url, loi: `http-${res.status}: ${than.slice(0, 200)}` };
+          }
+          const d: any = await res.json();
+          const k = d?.inspectionResult?.indexStatusResult ?? {};
+          return {
+            url,
+            trangThai: k.coverageState,
+            robots: k.robotsTxtState,
+            lanCuoiThuThap: k.lastCrawlTime,
+            urlChinhTac: k.googleCanonical,
+          };
+        } catch (e: any) {
+          return { url, loi: `ngoai-le: ${e.message}` };
+        }
+      }),
+    );
+  }
 }

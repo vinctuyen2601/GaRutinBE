@@ -477,6 +477,11 @@ export class TroLyService {
     return this.gsc.layTheoTrang(soNgay);
   }
 
+  /** Xem mục kiemTraUrl trong SearchConsoleService về ý nghĩa từng trạng thái. */
+  kiemChiMuc(urls: string[]) {
+    return this.gsc.kiemTraUrl(urls);
+  }
+
   /**
    * Đọc bảng xếp hạng Google cho tối đa 10 từ khoá một lượt.
    *

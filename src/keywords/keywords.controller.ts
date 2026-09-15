@@ -138,6 +138,15 @@ export class KeywordsController {
    * Ai đang đứng trên mình cho từng từ khoá.
    * Tối đa 10 từ mỗi lượt — xem chú thích ở troLy.doiThu về trần CloudFront.
    */
+  /**
+   * URL có trong chỉ mục Google không, và nếu không thì vì sao.
+   * Tối đa 10 URL mỗi lượt — trần 30 giây của CloudFront.
+   */
+  @Post('kiem-chi-muc')
+  kiemChiMuc(@Body() body: { urls?: string[] }) {
+    return this.troLy.kiemChiMuc(body?.urls ?? []);
+  }
+
   @Post('doi-thu')
   doiThu(@Body() body: { keywords?: string[] }) {
     return this.troLy.doiThu(body?.keywords ?? []);
