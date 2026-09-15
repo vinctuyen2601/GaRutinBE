@@ -403,4 +403,8 @@ export class TroLyService {
     await this.ggRepo.update({ id }, { daBoQua: true });
     return { ok: true };
   }
+  theoTrangGsc(soNgay = 90) {
+    return this.gsc.layTheoTrang(soNgay);
+  }
+
 }

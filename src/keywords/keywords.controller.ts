@@ -122,4 +122,9 @@ export class KeywordsController {
   applyBoSung(@Body() body: { text: string }) {
     return this.troLy.docKetQuaBoSung(body?.text ?? '');
   }
+  @Get('gsc-trang')
+  gscTrang(@Query('soNgay') soNgay?: string) {
+    return this.troLy.theoTrangGsc(Number(soNgay) || 90);
+  }
+
 }

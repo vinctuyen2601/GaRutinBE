@@ -173,4 +173,52 @@ export class SearchConsoleService {
       position: Number((r.position ?? 0).toFixed(1)),
     })).filter((r: DongGSC) => r.keyword);
   }
+  /**
+   * Số liệu theo TRANG, không phải theo truy vấn.
+   *
+   * Dữ liệu theo truy vấn không trả lời được "trang nào đang nhận lưu lượng"
+   * và "hai trang có đang giành nhau một từ khoá không". Đo 15/09/2026 bên
+   * 17fishing, chính chiều này lộ ra hai bài đang 404 mà vẫn xếp hạng 7-8,
+   * ngốn 988 hiển thị mỗi 90 ngày — nhìn theo truy vấn thì không thấy gì.
+   */
+  async layTheoTrang(soNgay = 90, gioiHan = 500): Promise<
+    { page: string; clicks: number; impressions: number; position: number }[]
+  > {
+    if (!this.daCauHinh()) {
+      throw new BadRequestException(
+        'Chưa cấu hình GSC_CLIENT_EMAIL, GSC_PRIVATE_KEY và GSC_SITE_URL trên máy chủ',
+      );
+    }
+    const { site } = this.cauHinh;
+    const token = await this.layToken();
+    const ngay = (lui: number) =>
+      new Date(Date.now() - lui * 86400_000).toISOString().slice(0, 10);
+
+    const res = await fetch(
+      `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site!)}/searchAnalytics/query`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: ngay(soNgay),
+          endDate: ngay(1),
+          dimensions: ['page'],
+          rowLimit: gioiHan,
+        }),
+      },
+    );
+    const data: any = await res.json();
+    if (!res.ok) {
+      throw new BadRequestException(
+        `Search Console trả lỗi: ${data.error?.message || res.status}`,
+      );
+    }
+    return (data.rows || []).map((r: any) => ({
+      page: r.keys?.[0] ?? '',
+      clicks: Math.round(r.clicks ?? 0),
+      impressions: Math.round(r.impressions ?? 0),
+      position: Number((r.position ?? 0).toFixed(1)),
+    }));
+  }
+
 }
