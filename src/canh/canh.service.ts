@@ -6,6 +6,16 @@ import { Post } from '../posts/entities/post.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SearchConsoleService } from '../keywords/search-console.service';
 
+/**
+ * Tên miền web. Repo này chưa có hằng số dùng chung như 17fishing
+ * (`config/shop.ts`) — tên miền đang gõ rải rác ở bốn chỗ, và tệ hơn là qua
+ * HAI biến môi trường khác nhau cho cùng một thứ: `SITE_URL` ở posts, `WEB_URL`
+ * ở products và tro-ly. Ở đây theo `SITE_URL` cho khớp phần sinh sitemap.
+ *
+ * Gom về một mối thì nên làm, nhưng không phải trong lúc sửa một lỗi khác.
+ */
+const SHOP_SITE_URL = (process.env.SITE_URL || 'https://garutin.com').replace(/\/+$/, '');
+
 /** Sự kiện để kênh thông báo đăng ký. Bật trong CMS → Cài đặt → Thông báo. */
 export const SU_KIEN_CANH = 'canh.canh-bao';
 
@@ -64,7 +74,9 @@ export class CanhService {
       this.logger.log('Canh hằng ngày: mọi thứ trong ngưỡng');
       return { soCanhBao: 0, canhBao: [] };
     }
-    const tin = ['⚠️ CANH HẰNG NGÀY', '', ...canhBao.map((c) => `• ${c}`)].join('\n');
+    // Tên miền trong tiêu đề: nếu sau này hai shop cùng đổ vào một kênh
+    // Telegram thì người đọc phải biết ngay tin này của shop nào.
+    const tin = [`⚠️ CANH HẰNG NGÀY — ${SHOP_SITE_URL.replace(/^https?:\/\//, '')}`, '', ...canhBao.map((c) => `• ${c}`)].join('\n');
     this.logger.warn(tin.replace(/\n/g, ' | '));
     await this.thongBao.dispatch(SU_KIEN_CANH, tin, {
       subject: 'Canh hằng ngày — có việc cần xem',
@@ -95,11 +107,16 @@ export class CanhService {
     const hong: string[] = [];
     for (const b of song) {
       for (const m of String(b.content ?? '').matchAll(/href="\/blog\/([a-z0-9-]+)"/g)) {
-        if (cheo.has(m[1])) hong.push(`/blog/${b.slug} → ${m[1]}`);
+        // URL ĐẦY ĐỦ, không phải đường dẫn tương đối: tin này đọc trên
+        // Telegram ở điện thoại, mà `/blog/abc` thì bấm không được — người
+        // nhận phải tự gõ tên miền vào. Một cảnh báo không bấm được là một
+        // cảnh báo bị hoãn lại tới lúc ngồi trước máy tính.
+        if (cheo.has(m[1])) hong.push(`${SHOP_SITE_URL}/blog/${b.slug}\n     ↳ trỏ tới bài đã gộp: ${m[1]}`);
       }
     }
     if (!hong.length) return null;
-    return `${hong.length} liên kết nội bộ trỏ vào trang chuyển hướng:\n   ${hong.slice(0, 5).join('\n   ')}`;
+    const them = hong.length > 5 ? `\n   … và ${hong.length - 5} liên kết nữa` : '';
+    return `${hong.length} liên kết nội bộ trỏ vào trang chuyển hướng:\n   ${hong.slice(0, 5).join('\n   ')}${them}`;
   }
 
   /** Google có còn đọc sitemap không, và nó có báo lỗi gì không. */
@@ -113,7 +130,10 @@ export class CanhService {
       if (!s.lanCuoiTaiVe) { y.push('Google chưa từng tải sitemap'); continue; }
       const ngay = Math.floor((Date.now() - new Date(s.lanCuoiTaiVe).getTime()) / 86_400_000);
       if (ngay > CanhService.NGUONG_NGAY_SITEMAP) {
-        y.push(`Google chưa đọc sitemap ${ngay} ngày — gửi lại trong Search Console`);
+        y.push(
+          `Google chưa đọc sitemap ${ngay} ngày — gửi lại tại\n     ` +
+            `https://search.google.com/search-console/sitemaps?resource_id=${encodeURIComponent(SHOP_SITE_URL)}`,
+        );
       }
     }
     return y.length ? y.join('\n   ') : null;
