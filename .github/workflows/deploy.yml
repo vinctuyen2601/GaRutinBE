@@ -26,7 +26,21 @@ jobs:
             set -e
             export PATH=/home/ubuntu/.nvm/versions/node/v23.11.1/bin:$PATH
             cd GaRutinBE
-            git pull
+            # KHÔNG dùng `git pull`. Máy chủ có thể có thay đổi cục bộ ở tệp
+            # được theo dõi — package-lock.json là trường hợp thật, nó bị sửa
+            # trên máy chủ từ lúc nào không rõ. `git pull` khi đó từ chối ghi
+            # đè và deploy chết ở bước đầu với thông báo "Your local changes
+            # would be overwritten by merge".
+            #
+            # Kiểu hỏng này ÂM THẦM: mọi commit không đụng tệp đó vẫn deploy
+            # bình thường, nên nó nằm im cho tới đúng lần thêm một gói mới.
+            # Ngày 15/09/2026 mất mười phút đoán mò vì chuyện này.
+            #
+            # `fetch` + `reset --hard` làm máy chủ luôn khớp đúng kho mã, không
+            # phụ thuộc trạng thái cũ. An toàn ở đây vì .env nằm ngoài git và
+            # `reset --hard` không đụng tệp chưa được theo dõi.
+            git fetch origin main
+            git reset --hard origin/main
             rm -f tsconfig.build.tsbuildinfo
             rm -rf node_modules
             npm ci
