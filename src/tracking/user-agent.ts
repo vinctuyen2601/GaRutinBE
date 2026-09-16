@@ -17,6 +17,14 @@ const BOT_RE = new RegExp(
     'facebookexternalhit', 'bingpreview', 'headless', 'phantomjs',
     'lighthouse', 'pagespeed', 'uptime', 'monitor', 'pingdom',
     'curl', 'wget', 'python-requests', 'go-http-client', 'axios', 'okhttp',
+    // Nhóm KHÔNG chứa chữ "bot" nên lọt hết mẫu chung ở trên. Đo ngày
+    // 16/09/2026 bên 17fishing: GoogleOther và Google-NotebookLM nằm lẫn trong
+    // nhóm "khách trực tiếp", được đếm như người thật.
+    'googleother', 'google-extended', 'google-notebooklm', 'adsbot',
+    'mediapartners', 'feedfetcher', 'apis-google',
+    'gptbot', 'oai-searchbot', 'chatgpt-user', 'claudebot', 'claude-web',
+    'anthropic-ai', 'perplexitybot', 'perplexity-user', 'bytespider',
+    'meta-externalagent', 'amazonbot', 'ccbot', 'dataforseo', 'ahrefs', 'semrush',
   ].join('|'),
   'i',
 );

@@ -83,7 +83,20 @@ END, '')`;
  * Bảng nguồn và bảng phễu đã lọc như vậy từ đầu; ba thống kê dưới đây thì
  * chưa, nên hai bên nói hai con số khác nhau về cùng một ngày.
  */
-const LUOT_XEM_THAT = "v.event = 'view' AND v.is_bot = false";
+/**
+ * Mẫu bot dùng Ở TẦNG ĐỌC, ngoài cờ `is_bot` đã lưu lúc ghi.
+ *
+ * Cần cả hai vì `is_bot` được tính MỘT LẦN lúc ghi, bằng danh sách bot của thời
+ * điểm đó. Thêm bot mới vào danh sách chỉ có tác dụng từ đó trở đi — hàng nghìn
+ * lượt cũ vẫn mang cờ false vĩnh viễn.
+ *
+ * Giữ ngắn và chỉ gồm thứ chắc chắn là máy: lọc nhầm khách thật ở tầng đọc thì
+ * không có cách nào phát hiện, vì lượt đó biến mất khỏi mọi báo cáo.
+ */
+const BOT_DOC = `(bot|crawl|spider|slurp|scraper|headless|googleother|google-extended|google-notebooklm|adsbot|mediapartners|feedfetcher|apis-google|bytespider|meta-externalagent|dataforseo|ahrefs|semrush)`;
+const KHONG_BOT = `(v.user_agent IS NULL OR v.user_agent !~* '${BOT_DOC}')`;
+
+const LUOT_XEM_THAT = `v.event = 'view' AND v.is_bot = false AND ${KHONG_BOT}`;
 
 const dateStart = (d: string) => d + 'T00:00:00+07:00';
 const dateEnd   = (d: string) => d + 'T23:59:59+07:00';
@@ -165,7 +178,7 @@ export class TrackingService {
     // Cùng điều kiện "lượt xem thật" như các thống kê khác trong tệp này: bỏ
     // bot, và chỉ tính bước 'view' — nếu tính cả add_to_cart/begin_checkout thì
     // một người mua sẽ được đếm thành nhiều lượt và bảng nguồn bị thổi phồng.
-    const dieuKien = ["v.is_bot = false AND v.event = 'view'"];
+    const dieuKien = [`v.is_bot = false AND v.event = 'view' AND ${KHONG_BOT}`];
     if (opts.from) {
       params.push(dateStart(opts.from));
       dieuKien.push(`v.created_at >= $${params.length}`);
@@ -375,7 +388,7 @@ export class TrackingService {
     // vẫn được đếm là "khách xem", trong khi "thêm giỏ" chỉ có từ lúc bật đo.
     // Hệ quả: mọi sản phẩm đều hiện "xem 3, thêm giỏ 0" và trông như trang sản
     // phẩm hỏng, dù thực ra chỉ là hai cột đo hai khoảng thời gian khác nhau.
-    const vConds = [`v.is_bot = false`, `v.path LIKE '/san-pham/%'`, `v.visitor_id IS NOT NULL`];
+    const vConds = [`v.is_bot = false`, KHONG_BOT, `v.path LIKE '/san-pham/%'`, `v.visitor_id IS NOT NULL`];
     const oConds = [`o.status <> 'cancelled'`, `(i->>'productId') IS NOT NULL`];
     if (from) {
       params.push(dateStart(from));
