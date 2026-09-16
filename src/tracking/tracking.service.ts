@@ -186,11 +186,16 @@ export class TrackingService {
                        -- nên khách bấm link mình gửi qua Zalo đều rơi vào nhóm
                        -- trực tiếp. User-Agent thì không mất vì nó ở header
                        -- HTTP — tách được cả dữ liệu cũ, không cần thu lại.
+                       -- Trả về ĐÚNG tên nền tảng, không hậu tố "(trong app)":
+                       -- lớp gom nhóm bên dưới quy mọi thứ chứa 'zalo' về
+                       -- 'zalo' nên hậu tố sẽ bị nuốt. Và gom vậy đúng với câu
+                       -- hỏi kinh doanh — cần biết khách đến từ Zalo bao nhiêu,
+                       -- không cần tách Zalo-có-UTM với Zalo-trong-ứng-dụng.
                        CASE
-                         WHEN v.user_agent ~* '\\mZalo\\M'                           THEN 'zalo (trong app)'
-                         WHEN v.user_agent ~* '(FBAN|FBAV|FB_IAB|FBIOS)'             THEN 'facebook (trong app)'
-                         WHEN v.user_agent ~* '\\mInstagram\\M'                      THEN 'instagram (trong app)'
-                         WHEN v.user_agent ~* '(BytedanceWebview|musical_ly|TikTok)'  THEN 'tiktok (trong app)'
+                         WHEN v.user_agent ~* '\\mZalo\\M'                           THEN 'zalo'
+                         WHEN v.user_agent ~* '(FBAN|FBAV|FB_IAB|FBIOS)'             THEN 'facebook'
+                         WHEN v.user_agent ~* '\\mInstagram\\M'                      THEN 'instagram'
+                         WHEN v.user_agent ~* '(BytedanceWebview|musical_ly|TikTok)'  THEN 'tiktok'
                        END,
                        'trực tiếp')                       AS source,
               COALESCE(NULLIF(v.utm_campaign, ''), '—')   AS campaign,
