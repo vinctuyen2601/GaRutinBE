@@ -16,7 +16,8 @@ export class PageVisit {
   @Column({ nullable: true })
   ip: string;
 
-  /** Bước trong phễu: view | add_to_cart | begin_checkout. */
+  /** Bước trong phễu: view | add_to_cart | begin_checkout | purchase, và hai
+   *  hành động chốt đơn thật của cửa hàng: zalo_click | phone_click. */
   @Column({ default: 'view' })
   event: string;
 

@@ -127,10 +127,15 @@ export class TrackingService {
     utmContent?: string;
   }): Promise<void> {
     const platform = (PLATFORMS.includes(dto.platform as Platform) ? dto.platform : 'other') as Platform;
-    // Chỉ nhận đúng bốn bước của phễu. Giá trị lạ do khách tự gửi mà lọt vào
+    // Chỉ nhận đúng các sự kiện đã biết. Giá trị lạ do khách tự gửi mà lọt vào
     // thì bảng phễu sinh ra những dòng không ai hiểu, và lượt xem bị mất khỏi
     // thống kê cũ vì không còn là 'view'.
-    const event = ['view', 'add_to_cart', 'begin_checkout', 'purchase']
+    //
+    // zalo_click và phone_click phải nằm trong danh sách: web bắn hai sự kiện
+    // này từ 18/09/2026, mà danh sách khi đó chỉ có bốn giá trị nên chúng bị
+    // quy về 'view' — mỗi cú bấm Zalo thành một lượt xem trang giả, còn phễu
+    // thì không bao giờ thấy chúng. Sai lặng lẽ, không lỗi, không cảnh báo.
+    const event = ['view', 'add_to_cart', 'begin_checkout', 'purchase', 'zalo_click', 'phone_click']
       .includes(dto.event ?? '') ? (dto.event as string) : 'view';
     await this.visitRepo.save(this.visitRepo.create({
       platform,
