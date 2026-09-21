@@ -65,7 +65,21 @@ export function noiNoiBo(
 
   const che = noiDung
     .replace(/<a[^>]*>[\s\S]*?<\/a>/g, (m) => ' '.repeat(m.length))
-    .replace(/<h[1-6][^>]*>[\s\S]*?<\/h[1-6]>/g, (m) => ' '.repeat(m.length));
+    .replace(/<h[1-6][^>]*>[\s\S]*?<\/h[1-6]>/g, (m) => ' '.repeat(m.length))
+    /**
+     * Che luôn RUỘT CỦA MỌI THẺ. Chữ trong `alt=`, `title=`, `aria-label=`
+     * không phải chữ người đọc thấy, nhưng `indexOf` bên dưới vẫn tìm ra và
+     * chèn thẻ <a> vào giữa thuộc tính — làm vỡ luôn cái thẻ đó.
+     *
+     * Đã xảy ra thật, tìm ra 21/09/2026 khi soi ảnh hỏng. Ví dụ sống:
+     *   alt="Kinh nghiệm <a href="/blog/chon-day-cau-chuan">chọn dây</a> câu…"
+     * Trình duyệt đọc alt tới dấu nháy thứ hai rồi coi phần còn lại là thuộc
+     * tính rác. Bốn bài của 17fishing dính, cả hai shop cùng lỗi.
+     *
+     * Phải đặt SAU hai phép che trên: che thẻ trước thì phần chữ nằm GIỮA
+     * <a> và </a> lại lộ ra, và ta chèn được link lồng trong link.
+     */
+    .replace(/<[^>]*>/g, (m) => ' '.repeat(m.length));
   const cheBo = bo(che);
   // Chỉ số tìm trên chuỗi đã hạ chữ phải TRÙNG ĐỘ DÀI chuỗi gốc, nếu không
   // chèn lệch vị trí và vỡ HTML. Đã bắt được một bài như vậy khi chạy thật.
