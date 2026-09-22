@@ -112,6 +112,68 @@ const BOT_DOC = `(${BOT_PATTERN})`;
 
 const KHONG_BOT = `(v.user_agent IS NULL OR v.user_agent !~* '${BOT_DOC}')`;
 
+/**
+ * Nguồn THÔ của một lượt: utm_source, rồi referrer đã bỏ tên miền nhà, rồi
+ * User-Agent của trình duyệt trong ứng dụng, cuối cùng mới là 'trực tiếp'.
+ *
+ * Tách thành hằng ngày 22/09/2026. Trước đó nó nằm nội dòng trong
+ * `getSourceTable`, nên `soiTrucTiep` phải chép lại — hai bản chép tay thì
+ * sớm muộn cũng lệch, đúng kiểu đã dính với danh sách bot.
+ */
+const NGUON_THO = `COALESCE(NULLIF(v.utm_source, ''),
+       -- Bỏ referrer của chính mình NGAY Ở TẦNG ĐỌC: bản ghi
+       -- cũ đã lỡ lưu admin.<tên miền> vẫn nằm đó, sửa tầng
+       -- ghi không làm chúng biến mất.
+       ${REF_SACH},
+       -- Trước khi kết luận "trực tiếp", đọc User-Agent.
+       -- Trình duyệt trong ứng dụng Zalo KHÔNG gửi referrer,
+       -- nên khách bấm link mình gửi qua Zalo đều rơi vào nhóm
+       -- trực tiếp. User-Agent thì không mất vì nó ở header
+       -- HTTP — tách được cả dữ liệu cũ, không cần thu lại.
+       -- Trả về ĐÚNG tên nền tảng, không hậu tố "(trong app)":
+       -- lớp gom nhóm bên dưới quy mọi thứ chứa 'zalo' về
+       -- 'zalo' nên hậu tố sẽ bị nuốt. Và gom vậy đúng với câu
+       -- hỏi kinh doanh — cần biết khách đến từ Zalo bao nhiêu,
+       -- không cần tách Zalo-có-UTM với Zalo-trong-ứng-dụng.
+       CASE
+         WHEN v.user_agent ~* '\\mZalo\\M'                           THEN 'zalo'
+         WHEN v.user_agent ~* '(FBAN|FBAV|FB_IAB|FBIOS)'             THEN 'facebook'
+         WHEN v.user_agent ~* '\\mInstagram\\M'                      THEN 'instagram'
+         WHEN v.user_agent ~* '(BytedanceWebview|musical_ly|TikTok)'  THEN 'tiktok'
+       END,
+       'trực tiếp')`;
+
+/**
+ * Gom các tên miền của cùng một nền tảng về MỘT tên.
+ *
+ * Chú thích trong SQL của `getSourceTable` từ lâu đã viết "lớp gom nhóm bên
+ * dưới quy mọi thứ chứa 'zalo' về 'zalo'" — nhưng lớp đó chưa bao giờ tồn tại
+ * ở repo này. 17fishing có (`SOURCE_EXPR`), GaRutin thì không, và đó là một
+ * trong những chỗ hai repo đã trôi dạt.
+ *
+ * Hậu quả đo được ngày 22/09/2026: bảng nguồn 90 ngày hiện `google.com` 132
+ * lượt, `google` 9, `google.com.vn` 5 thành BA dòng riêng — Google thật là
+ * 146. `tiktok.com` và `tiktok` cũng tách đôi, `facebook` và `m.facebook.com`
+ * cũng vậy. Không dòng nào đủ lớn để thấy một nguồn thật sự mang về bao nhiêu.
+ *
+ * 'trực tiếp' rơi xuống nhánh ELSE nên giữ nguyên tên, không cần liệt kê.
+ */
+const NGUON = `(CASE
+  WHEN __SRC__ ILIKE '%facebook%' OR __SRC__ IN ('m.me', 'l.messenger.com', 'fb.com') THEN 'facebook'
+  WHEN __SRC__ ILIKE '%google%'   THEN 'google'
+  WHEN __SRC__ ILIKE '%tiktok%'   THEN 'tiktok'
+  WHEN __SRC__ ILIKE '%youtu%'    THEN 'youtube'
+  WHEN __SRC__ ILIKE '%zalo%'     THEN 'zalo'
+  WHEN __SRC__ ILIKE '%instagram%' THEN 'instagram'
+  WHEN __SRC__ ILIKE '%shopee%'   THEN 'shopee'
+  WHEN __SRC__ ILIKE '%lazada%'   THEN 'lazada'
+  WHEN __SRC__ ILIKE '%coccoc%'   THEN 'coc coc'
+  WHEN __SRC__ ILIKE '%bing%'     THEN 'bing'
+  WHEN __SRC__ ILIKE '%yahoo%'    THEN 'yahoo'
+  WHEN __SRC__ ILIKE '%chatgpt%' OR __SRC__ ILIKE '%openai%' THEN 'chatgpt'
+  ELSE __SRC__
+END)`.replace(/__SRC__/g, NGUON_THO);
+
 const LUOT_XEM_THAT = `v.event = 'view' AND v.is_bot = false AND ${KHONG_BOT}`;
 
 const dateStart = (d: string) => d + 'T00:00:00+07:00';
@@ -210,28 +272,7 @@ export class TrackingService {
     }
 
     const rows = await this.visitRepo.query(
-      `SELECT COALESCE(NULLIF(v.utm_source, ''),
-                       -- Bỏ referrer của chính mình NGAY Ở TẦNG ĐỌC: bản ghi
-                       -- cũ đã lỡ lưu admin.<tên miền> vẫn nằm đó, sửa tầng
-                       -- ghi không làm chúng biến mất.
-                       ${REF_SACH},
-                       -- Trước khi kết luận "trực tiếp", đọc User-Agent.
-                       -- Trình duyệt trong ứng dụng Zalo KHÔNG gửi referrer,
-                       -- nên khách bấm link mình gửi qua Zalo đều rơi vào nhóm
-                       -- trực tiếp. User-Agent thì không mất vì nó ở header
-                       -- HTTP — tách được cả dữ liệu cũ, không cần thu lại.
-                       -- Trả về ĐÚNG tên nền tảng, không hậu tố "(trong app)":
-                       -- lớp gom nhóm bên dưới quy mọi thứ chứa 'zalo' về
-                       -- 'zalo' nên hậu tố sẽ bị nuốt. Và gom vậy đúng với câu
-                       -- hỏi kinh doanh — cần biết khách đến từ Zalo bao nhiêu,
-                       -- không cần tách Zalo-có-UTM với Zalo-trong-ứng-dụng.
-                       CASE
-                         WHEN v.user_agent ~* '\\mZalo\\M'                           THEN 'zalo'
-                         WHEN v.user_agent ~* '(FBAN|FBAV|FB_IAB|FBIOS)'             THEN 'facebook'
-                         WHEN v.user_agent ~* '\\mInstagram\\M'                      THEN 'instagram'
-                         WHEN v.user_agent ~* '(BytedanceWebview|musical_ly|TikTok)'  THEN 'tiktok'
-                       END,
-                       'trực tiếp')                       AS source,
+      `SELECT ${NGUON}                       AS source,
               COALESCE(NULLIF(v.utm_campaign, ''), '—')   AS campaign,
               CASE
                 -- Có utm_medium trả tiền → quảng cáo. Xét medium trước mọi thứ vì
@@ -721,28 +762,7 @@ export class TrackingService {
     doSau: { nhom: string; khach: number; luot: number }[];
     tuongTac: { event: string; luot: number; khach: number }[];
   }> {
-    const NGUON = `COALESCE(NULLIF(v.utm_source, ''),
-                       -- Bỏ referrer của chính mình NGAY Ở TẦNG ĐỌC: bản ghi
-                       -- cũ đã lỡ lưu admin.<tên miền> vẫn nằm đó, sửa tầng
-                       -- ghi không làm chúng biến mất.
-                       ${REF_SACH},
-                       -- Trước khi kết luận "trực tiếp", đọc User-Agent.
-                       -- Trình duyệt trong ứng dụng Zalo KHÔNG gửi referrer,
-                       -- nên khách bấm link mình gửi qua Zalo đều rơi vào nhóm
-                       -- trực tiếp. User-Agent thì không mất vì nó ở header
-                       -- HTTP — tách được cả dữ liệu cũ, không cần thu lại.
-                       -- Trả về ĐÚNG tên nền tảng, không hậu tố "(trong app)":
-                       -- lớp gom nhóm bên dưới quy mọi thứ chứa 'zalo' về
-                       -- 'zalo' nên hậu tố sẽ bị nuốt. Và gom vậy đúng với câu
-                       -- hỏi kinh doanh — cần biết khách đến từ Zalo bao nhiêu,
-                       -- không cần tách Zalo-có-UTM với Zalo-trong-ứng-dụng.
-                       CASE
-                         WHEN v.user_agent ~* '\\mZalo\\M'                           THEN 'zalo'
-                         WHEN v.user_agent ~* '(FBAN|FBAV|FB_IAB|FBIOS)'             THEN 'facebook'
-                         WHEN v.user_agent ~* '\\mInstagram\\M'                      THEN 'instagram'
-                         WHEN v.user_agent ~* '(BytedanceWebview|musical_ly|TikTok)'  THEN 'tiktok'
-                       END,
-                       'trực tiếp')`;
+    // Dùng hằng NGUON ở đầu tệp — không chép lại biểu thức nguồn.
     const uaTop = await this.visitRepo.query(
       `SELECT COALESCE(NULLIF(v.user_agent, ''), '(không có UA)') AS ua,
               COUNT(*)::int AS luot,
