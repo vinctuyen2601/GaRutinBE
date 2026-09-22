@@ -57,6 +57,13 @@ export class TrackingController {
     return this.service.getSourceTable({ from, to });
   }
 
+  /** Soi nhóm "trực tiếp": người thật hay máy. Xem chú thích ở service. */
+  @Get('admin/analytics/soi-truc-tiep')
+  @UseGuards(JwtAuthGuard)
+  soiTrucTiep() {
+    return this.service.soiTrucTiep();
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('admin/analytics/table')
   getVisitTable(

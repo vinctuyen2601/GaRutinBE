@@ -11,8 +11,11 @@
  * không giao diện. Thiếu vài con thì thống kê hơi phồng, chứ không sai lệch
  * kiểu nguy hiểm — nên ưu tiên không bắt nhầm khách thật.
  */
-const BOT_RE = new RegExp(
-  [
+/**
+ * Danh sách dùng chung cho CẢ HAI tầng — xuất ra để tầng đọc khỏi chép lại.
+ * Trước 22/09/2026 tầng đọc có bản chép tay riêng, thiếu 24 mục.
+ */
+export const BOT_PATTERN = [
     'bot', 'crawl', 'spider', 'slurp', 'scraper',
     'facebookexternalhit', 'bingpreview', 'headless', 'phantomjs',
     'lighthouse', 'pagespeed', 'uptime', 'monitor', 'pingdom',
@@ -25,9 +28,13 @@ const BOT_RE = new RegExp(
     'gptbot', 'oai-searchbot', 'chatgpt-user', 'claudebot', 'claude-web',
     'anthropic-ai', 'perplexitybot', 'perplexity-user', 'bytespider',
     'meta-externalagent', 'amazonbot', 'ccbot', 'dataforseo', 'ahrefs', 'semrush',
-  ].join('|'),
-  'i',
-);
+    // Thêm 22/09/2026: soi nhóm "trực tiếp" bên 17fishing thấy
+    // Google-Read-Aloud được đếm như người thật — UA của nó KHÔNG chứa chữ
+    // "bot" nên lọt mọi mẫu chung ở trên.
+    'google-read-aloud', 'google-inspectiontool', 'storebot-google',
+  ].join('|');
+
+const BOT_RE = new RegExp(BOT_PATTERN, 'i');
 
 /** UA rỗng gần như luôn là kịch bản tự động, khách thật thì trình duyệt nào cũng gửi. */
 export function isBotUserAgent(ua?: string | null): boolean {

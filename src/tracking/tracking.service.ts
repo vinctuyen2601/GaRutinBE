@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { PageVisit, Platform } from './entities/page-visit.entity';
 import { Order } from '../orders/entities/order.entity';
 import { Product } from '../products/entities/product.entity';
+import { BOT_PATTERN } from './user-agent';
 
 const PLATFORMS: Platform[] = ['facebook', 'youtube', 'tiktok', 'zalo', 'web', 'other'];
 
@@ -93,7 +94,22 @@ END, '')`;
  * Giữ ngắn và chỉ gồm thứ chắc chắn là máy: lọc nhầm khách thật ở tầng đọc thì
  * không có cách nào phát hiện, vì lượt đó biến mất khỏi mọi báo cáo.
  */
-const BOT_DOC = `(bot|crawl|spider|slurp|scraper|headless|googleother|google-extended|google-notebooklm|adsbot|mediapartners|feedfetcher|apis-google|bytespider|meta-externalagent|dataforseo|ahrefs|semrush)`;
+/**
+ * Lọc bot lúc ĐỌC. Lấy thẳng danh sách từ `user-agent.ts` thay vì chép lại.
+ *
+ * Bản chép tay cũ chỉ có 18 mục trong khi `BOT_RE` lúc GHI có 42 — thiếu 24
+ * mục gồm curl, wget, lighthouse, gptbot, claudebot, chatgpt-user,
+ * perplexitybot, facebookexternalhit.
+ *
+ * Hai danh sách đều cần: cờ `is_bot` chỉ đúng với dòng ghi SAU khi một tên
+ * được thêm vào, còn bộ lọc lúc đọc mới chữa được dòng CŨ — mà bản lúc đọc
+ * thiếu tên thì dòng cũ không có gì đỡ.
+ *
+ * Tìm ra 22/09/2026 khi soi nhóm "trực tiếp" của 17fishing. Bên đó đã gộp
+ * cùng ngày; bên này lúc ấy còn nguyên. Đúng họ với bẫy whitelist EVENTS.
+ */
+const BOT_DOC = `(${BOT_PATTERN})`;
+
 const KHONG_BOT = `(v.user_agent IS NULL OR v.user_agent !~* '${BOT_DOC}')`;
 
 const LUOT_XEM_THAT = `v.event = 'view' AND v.is_bot = false AND ${KHONG_BOT}`;
@@ -683,4 +699,91 @@ export class TrackingService {
       .filter(r => r.views > 0 || r.orders > 0)
       .sort((a, b) => (b.views + b.orders * 10) - (a.views + a.orders * 10));
   }
+
+  /**
+   * Soi nhóm "trực tiếp" — chuyển từ 17fishing sang ngày 22/09/2026.
+   *
+   * Vì sao cần: đo 90 ngày thì GaRutin có **87%** lượt rơi vào nhóm trực tiếp
+   * (1.406/1.614), trong khi 17fishing chỉ 50%. Bảng nguồn không nói được đó
+   * là người hay máy, vì nó chỉ nhóm theo referrer và UTM.
+   *
+   * Bốn phép đo, mỗi cái bắt một kiểu bot khác nhau:
+   *   uaTop    UA kèm SỐ LƯỢT và số khách — bot lặp một UA rất nhiều lần
+   *   theoGio  phân bố giờ VN của RIÊNG nhóm này — bot rải đều 24h
+   *   doSau    số trang mỗi khách — bot hoặc 1 trang, hoặc hàng trăm
+   *   tuongTac sự kiện khác 'view' của chính nhóm đó
+   *
+   * Phép cuối mạnh nhất vì không dựa vào User-Agent, mà UA thì bot giả được.
+   */
+  async soiTrucTiep(): Promise<{
+    uaTop: { ua: string; luot: number; khach: number }[];
+    theoGio: { bucket: number; luot: number }[];
+    doSau: { nhom: string; khach: number; luot: number }[];
+    tuongTac: { event: string; luot: number; khach: number }[];
+  }> {
+    const NGUON = `COALESCE(NULLIF(v.utm_source, ''),
+                       -- Bỏ referrer của chính mình NGAY Ở TẦNG ĐỌC: bản ghi
+                       -- cũ đã lỡ lưu admin.<tên miền> vẫn nằm đó, sửa tầng
+                       -- ghi không làm chúng biến mất.
+                       ${REF_SACH},
+                       -- Trước khi kết luận "trực tiếp", đọc User-Agent.
+                       -- Trình duyệt trong ứng dụng Zalo KHÔNG gửi referrer,
+                       -- nên khách bấm link mình gửi qua Zalo đều rơi vào nhóm
+                       -- trực tiếp. User-Agent thì không mất vì nó ở header
+                       -- HTTP — tách được cả dữ liệu cũ, không cần thu lại.
+                       -- Trả về ĐÚNG tên nền tảng, không hậu tố "(trong app)":
+                       -- lớp gom nhóm bên dưới quy mọi thứ chứa 'zalo' về
+                       -- 'zalo' nên hậu tố sẽ bị nuốt. Và gom vậy đúng với câu
+                       -- hỏi kinh doanh — cần biết khách đến từ Zalo bao nhiêu,
+                       -- không cần tách Zalo-có-UTM với Zalo-trong-ứng-dụng.
+                       CASE
+                         WHEN v.user_agent ~* '\\mZalo\\M'                           THEN 'zalo'
+                         WHEN v.user_agent ~* '(FBAN|FBAV|FB_IAB|FBIOS)'             THEN 'facebook'
+                         WHEN v.user_agent ~* '\\mInstagram\\M'                      THEN 'instagram'
+                         WHEN v.user_agent ~* '(BytedanceWebview|musical_ly|TikTok)'  THEN 'tiktok'
+                       END,
+                       'trực tiếp')`;
+    const uaTop = await this.visitRepo.query(
+      `SELECT COALESCE(NULLIF(v.user_agent, ''), '(không có UA)') AS ua,
+              COUNT(*)::int AS luot,
+              COUNT(DISTINCT COALESCE(v.visitor_id, v.ip))::int AS khach
+         FROM page_visits v
+        WHERE ${LUOT_XEM_THAT} AND ${NGUON} = 'trực tiếp'
+        GROUP BY 1 ORDER BY 2 DESC LIMIT 25`,
+    );
+    const theoGio = await this.visitRepo.query(
+      // Một bước. created_at là TIMESTAMPTZ; công thức hai bước là dấu hiệu lỗi.
+      `SELECT FLOOR(EXTRACT(HOUR FROM v.created_at AT TIME ZONE 'Asia/Ho_Chi_Minh') / 4)::int AS bucket,
+              COUNT(*)::int AS luot
+         FROM page_visits v
+        WHERE ${LUOT_XEM_THAT} AND ${NGUON} = 'trực tiếp'
+        GROUP BY 1 ORDER BY 1`,
+    );
+    const doSau = await this.visitRepo.query(
+      `SELECT CASE WHEN n = 1 THEN '1 trang'
+                   WHEN n BETWEEN 2 AND 3 THEN '2-3 trang'
+                   WHEN n BETWEEN 4 AND 10 THEN '4-10 trang'
+                   ELSE 'hơn 10 trang' END AS nhom,
+              COUNT(*)::int AS khach, SUM(n)::int AS luot
+         FROM (SELECT COALESCE(v.visitor_id, v.ip) AS ai, COUNT(*)::int AS n
+                 FROM page_visits v
+                WHERE ${LUOT_XEM_THAT} AND ${NGUON} = 'trực tiếp'
+                GROUP BY 1) t
+        GROUP BY 1 ORDER BY 2 DESC`,
+    );
+    const tuongTac = await this.visitRepo.query(
+      `SELECT v.event, COUNT(*)::int AS luot,
+              COUNT(DISTINCT COALESCE(v.visitor_id, v.ip))::int AS khach
+         FROM page_visits v
+        WHERE v.event <> 'view' AND v.is_bot = false AND ${KHONG_BOT}
+          AND COALESCE(v.visitor_id, v.ip) IN (
+                SELECT COALESCE(x.visitor_id, x.ip) FROM page_visits x
+                 WHERE x.event = 'view' AND x.is_bot = false
+                   AND (x.user_agent IS NULL OR x.user_agent !~* '${BOT_DOC}')
+                   AND ${NGUON.replace(/v\./g, 'x.')} = 'trực tiếp')
+        GROUP BY 1 ORDER BY 2 DESC`,
+    );
+    return { uaTop, theoGio, doSau, tuongTac };
+  }
+
 }
